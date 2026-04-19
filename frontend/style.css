@@ -1371,6 +1371,232 @@ input[type="text"]:focus {
   to   { opacity: 1; transform: translateX(0); }
 }
 
+/* ---- Orientation lock (mobile portrait) ---- */
+
+.orientation-lock { display: none; }
+
+@media (max-width: 900px) and (orientation: portrait) and (pointer: coarse) {
+  .orientation-lock {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+    background:
+      radial-gradient(ellipse at top, rgba(28, 17, 64, 0.98), rgba(10, 6, 20, 0.98)),
+      var(--bg-0);
+    backdrop-filter: blur(12px);
+    text-align: center;
+  }
+  body { overflow: hidden; }
+}
+
+.orientation-content {
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  animation: fadeUp 0.5s ease-out;
+}
+
+.orientation-icon-wrap {
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.15), transparent 70%);
+  border-radius: 50%;
+  margin-bottom: 0.5rem;
+}
+
+.orient-phone { width: 100%; height: 100%; }
+.orient-phone-body {
+  transform-origin: 60px 60px;
+  animation: orientRotate 2.4s ease-in-out infinite;
+}
+.orient-arrow, .orient-arrow-head {
+  animation: orientArrow 2.4s ease-in-out infinite;
+}
+@keyframes orientRotate {
+  0%, 15%   { transform: rotate(0deg); }
+  60%, 85%  { transform: rotate(-90deg); }
+  100%      { transform: rotate(0deg); }
+}
+@keyframes orientArrow {
+  0%, 15%   { opacity: 0.4; }
+  40%, 70%  { opacity: 1; }
+  100%      { opacity: 0.4; }
+}
+
+.orientation-content h2 {
+  font-family: "Cinzel", serif;
+  font-size: 1.7rem;
+  margin: 0;
+  background: linear-gradient(135deg, var(--accent-warm), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: 0.04em;
+}
+.orient-main {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.orient-main strong { color: var(--accent-warm); }
+.orient-sub {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* ---- Mobile landscape: compact layout ---- */
+
+@media (max-height: 560px) and (orientation: landscape),
+       (max-width: 900px) and (orientation: landscape) {
+  .topbar {
+    padding: 0.4rem 0.6rem;
+    gap: 0.5rem;
+  }
+  .topbar-brand { font-size: 0.95rem; letter-spacing: 0.06em; }
+  .status-bar { gap: 0.3rem; }
+  .status-item {
+    min-width: 0;
+    padding: 0.2rem 0.5rem;
+  }
+  .status-item .status-key { font-size: 0.58rem; }
+  .status-item .status-val { font-size: 0.8rem; }
+  .room-badge { padding: 0.25rem 0.5rem; }
+  .room-badge .room-label { display: none; }
+  .room-code { font-size: 0.8rem; letter-spacing: 0.15em; }
+  .help-btn { width: 26px; height: 26px; font-size: 0.85rem; }
+
+  .game-grid {
+    grid-template-columns: 148px 1fr 168px;
+    gap: 0.45rem;
+    padding: 0.45rem;
+  }
+  .players-panel { grid-column: 1; grid-row: 1; }
+  .table-panel   { grid-column: 2; grid-row: 1; }
+  .chat-panel    { grid-column: 3; grid-row: 1; }
+  .hand-panel    { grid-column: 1 / -1; grid-row: 2; }
+
+  .panel { padding: 0.55rem 0.6rem; border-radius: 12px; }
+  .panel-title { font-size: 0.62rem; margin-bottom: 0.4rem; letter-spacing: 0.12em; }
+
+  .player-chip {
+    grid-template-columns: 28px 1fr auto;
+    gap: 0.4rem;
+    padding: 0.35rem 0.45rem;
+  }
+  .player-avatar { width: 28px; height: 28px; font-size: 0.85rem; border-width: 1px; }
+  .player-info .pname { font-size: 0.78rem; }
+  .player-info .pstats { gap: 0.3rem; }
+  .pstat .label { font-size: 0.56rem; }
+  .pstat .value { font-size: 0.75rem; }
+  .score-pill { font-size: 0.72rem; padding: 2px 7px; }
+  .dealer-badge { font-size: 0.52rem; padding: 1px 4px; top: -5px; right: -5px; }
+  #players-list { gap: 0.35rem; }
+
+  .trump-card-area {
+    padding: 0.45rem 0.6rem;
+    min-height: 0;
+    gap: 0.5rem;
+  }
+  .trump-card-area .trump-label-big { font-size: 0.6rem; }
+  .trump-caption .trump-suit-name { font-size: 0.95rem; }
+  .trump-caption .trump-desc { font-size: 0.72rem; }
+  .blind-round-badge { font-size: 0.62rem; padding: 0.2rem 0.55rem; }
+
+  .felt-table { min-height: 180px; border-radius: 20px; }
+  .trick-seat .seat-avatar { width: 24px; height: 24px; font-size: 0.65rem; border-width: 1px; }
+  .trick-seat .seat-name { font-size: 0.62rem; padding: 1px 5px; }
+  .trick-center { font-size: 0.75rem; }
+  .winner-announce { font-size: 0.72rem; padding: 0.3rem 0.8rem; }
+
+  .action-zone { padding: 0.5rem 0.6rem; min-height: 0; }
+  .action-zone p { font-size: 0.8rem; }
+  .action-zone .subtle { font-size: 0.72rem; }
+  .bid-btn { min-width: 38px; height: 38px; font-size: 0.9rem; }
+
+  .chat-panel { min-height: 0; }
+  #chat-log { min-height: 80px; font-size: 0.75rem; padding: 0.4rem; }
+  .chat-msg { padding: 0.2rem 0.4rem; font-size: 0.72rem; }
+  .chat-msg .from { font-size: 0.68rem; }
+  .quick-chip { font-size: 0.68rem; padding: 0.2rem 0.5rem; }
+  .emoji-chip { width: 26px; height: 26px; font-size: 0.95rem; }
+  .emoji-bar { padding: 0.15rem 0; }
+  #chat-form input { font-size: 0.75rem; padding: 0.35rem 0.5rem; }
+
+  .hand-cards { min-height: 110px; gap: 0.3rem; padding: 0.2rem; }
+  .card { --card-w: 60px; --card-h: 86px; }
+  .card .corner { font-size: 0.7rem; }
+  .card .corner .num { font-size: 0.75rem; }
+  .card .center { font-size: 1.55rem; }
+  .card.small { --card-w: 44px; --card-h: 64px; }
+  .card.small .center { font-size: 1.1rem; }
+
+  .trump-card-area .card.small { --card-w: 38px; --card-h: 56px; }
+}
+
+/* ---- Blind round: reduzierte Spieler-Chips ---- */
+
+.player-chip.blind-mode {
+  grid-template-columns: 36px 1fr auto;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+}
+.player-chip.blind-mode .pstats {
+  gap: 0.55rem;
+  font-size: 0.68rem;
+}
+.player-chip.blind-mode .pstat .label {
+  font-size: 0.56rem;
+  opacity: 0.85;
+}
+.player-chip.blind-mode .pstat .value {
+  font-size: 0.8rem;
+}
+.player-chip.blind-mode .score-pill {
+  font-size: 0.78rem;
+  padding: 2px 8px;
+}
+.player-chip.blind-mode .blind-peek {
+  margin-top: 5px;
+  justify-content: center;
+  gap: 3px;
+}
+.player-chip.blind-mode .blind-peek .card {
+  --card-w: 46px;
+  --card-h: 66px;
+}
+.player-chip.blind-mode .blind-peek .card .corner { font-size: 0.62rem; }
+.player-chip.blind-mode .blind-peek .card .corner .num { font-size: 0.7rem; }
+.player-chip.blind-mode .blind-peek .card .center { font-size: 1.1rem; }
+
+/* Own chip in blind round: show hidden card backs smaller too */
+.player-chip.blind-mode.is-me { opacity: 0.85; }
+
+/* On mobile landscape: blind cards even smaller + cleaner */
+@media (max-height: 560px) and (orientation: landscape),
+       (max-width: 900px) and (orientation: landscape) {
+  .player-chip.blind-mode .blind-peek .card {
+    --card-w: 36px;
+    --card-h: 52px;
+  }
+  .player-chip.blind-mode .blind-peek .card .corner { font-size: 0.5rem; }
+  .player-chip.blind-mode .blind-peek .card .corner .num { font-size: 0.56rem; }
+  .player-chip.blind-mode .blind-peek .card .center { font-size: 0.85rem; }
+  /* Hide Gewonnen during blind bidding (always 0) to reduce noise */
+  .player-chip.blind-mode.phase-bidding .pstat.stat-won { display: none; }
+}
+
 /* Scrollbars */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }

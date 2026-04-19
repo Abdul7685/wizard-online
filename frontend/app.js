@@ -446,6 +446,11 @@ function renderPlayers(gs) {
     if (p.id === gs.current_player && gs.phase !== "round_done" && gs.phase !== "game_over") {
       chip.classList.add("current");
     }
+    if (gs.blind_round) {
+      chip.classList.add("blind-mode");
+      chip.classList.add(`phase-${gs.phase}`);
+      if (p.id === state.playerId) chip.classList.add("is-me");
+    }
 
     const idx = state.playerOrderIndex.get(p.id) ?? 0;
     const avatar = document.createElement("div");
@@ -471,7 +476,7 @@ function renderPlayers(gs) {
     stats.appendChild(sayStat);
 
     const wonStat = document.createElement("div");
-    wonStat.className = "pstat";
+    wonStat.className = "pstat stat-won";
     let wonClass = "";
     if (p.bid !== null && p.bid !== undefined && gs.phase !== "bidding") {
       wonClass = (p.tricks === p.bid) ? " match" : "";
