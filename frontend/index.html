@@ -39,6 +39,10 @@
       </div>
 
       <p class="error" id="lobby-error"></p>
+
+      <button id="rules-btn" class="btn btn-ghost btn-rules">
+        <span class="btn-icon">✨</span> Wie spielt man?
+      </button>
     </div>
   </div>
 
@@ -73,10 +77,13 @@
         </div>
       </div>
 
-      <div class="room-badge">
-        <span class="room-label">Raum</span>
-        <span id="room-info" class="room-code"></span>
-        <button id="copy-room" class="btn-icon-only" title="Kopieren">⎘</button>
+      <div class="topbar-right">
+        <button id="rules-btn-game" class="btn-icon-only help-btn" title="Wie spielt man?">?</button>
+        <div class="room-badge">
+          <span class="room-label">Raum</span>
+          <span id="room-info" class="room-code"></span>
+          <button id="copy-room" class="btn-icon-only" title="Kopieren">⎘</button>
+        </div>
       </div>
     </header>
 
@@ -106,6 +113,32 @@
         </div>
         <div class="chat-body">
           <div id="chat-log"></div>
+          <div id="quick-reactions" class="quick-reactions">
+            <button class="quick-chip" data-msg="Nice!">Nice!</button>
+            <button class="quick-chip" data-msg="Nooo 😭">Nooo 😭</button>
+            <button class="quick-chip" data-msg="Easy 😎">Easy 😎</button>
+            <button class="quick-chip" data-msg="Glück gehabt 🍀">Glück 🍀</button>
+            <button class="quick-chip" data-msg="Was war das 😂">Was war das 😂</button>
+            <button class="quick-chip" data-msg="GG!">GG!</button>
+            <button class="quick-chip" data-msg="Ich hab's gewusst 😏">Gewusst 😏</button>
+            <button class="quick-chip" data-msg="Rip 💀">Rip 💀</button>
+            <button class="quick-chip" data-msg="All-in 😈">All-in 😈</button>
+            <button class="quick-chip" data-msg="Bruder… 🤦‍♂️">Bruder 🤦‍♂️</button>
+          </div>
+          <div id="emoji-bar" class="emoji-bar">
+            <button class="emoji-chip" data-emoji="😄">😄</button>
+            <button class="emoji-chip" data-emoji="😂">😂</button>
+            <button class="emoji-chip" data-emoji="😭">😭</button>
+            <button class="emoji-chip" data-emoji="😎">😎</button>
+            <button class="emoji-chip" data-emoji="🤯">🤯</button>
+            <button class="emoji-chip" data-emoji="😈">😈</button>
+            <button class="emoji-chip" data-emoji="🤦‍♂️">🤦‍♂️</button>
+            <button class="emoji-chip" data-emoji="🧠">🧠</button>
+            <button class="emoji-chip" data-emoji="🔥">🔥</button>
+            <button class="emoji-chip" data-emoji="💀">💀</button>
+            <button class="emoji-chip" data-emoji="👀">👀</button>
+            <button class="emoji-chip" data-emoji="🎯">🎯</button>
+          </div>
           <form id="chat-form">
             <input id="chat-input" type="text" maxlength="200" placeholder="Nachricht..." autocomplete="off" />
             <button type="submit" class="btn btn-sm btn-primary">↵</button>
@@ -142,6 +175,84 @@
         </table>
       </div>
       <div class="modal-footer" id="round-modal-footer"></div>
+    </div>
+  </div>
+
+  <!-- Rules modal -->
+  <div id="rules-modal" class="modal-overlay hidden">
+    <div class="modal-card rules-card">
+      <div class="modal-header rules-header">
+        <h2>✨ So spielst du Wizard</h2>
+        <button id="rules-modal-close" class="modal-close" title="Schließen">✕</button>
+      </div>
+      <div class="modal-body rules-body">
+
+        <div class="rule-block">
+          <h3><span class="rule-icon">🎯</span> Das Ziel</h3>
+          <ul>
+            <li>In jeder Runde bekommst du Karten.</li>
+            <li>Vor dem Spielen sagst du, wie viele <strong>Stiche</strong> du glaubst zu gewinnen.</li>
+            <li>Triffst du <strong>genau</strong> → viele Punkte.</li>
+            <li>Liegst du daneben → Minuspunkte.</li>
+          </ul>
+        </div>
+
+        <div class="rule-block">
+          <h3><span class="rule-icon">🃏</span> Unsere Hausregeln</h3>
+          <ul>
+            <li><strong>Runde 1 ist blind:</strong> Du siehst deine eigene Karte nicht — nur die der anderen.</li>
+            <li>Die aufgedeckte Karte bestimmt den <strong>Trumpf</strong>.</li>
+            <li><strong>Wizard oder Narr aufgedeckt</strong> → kein Trumpf in dieser Runde.</li>
+            <li>Wird eine Farbe angespielt und du hast sie, <strong>musst</strong> du sie spielen.</li>
+            <li>Dann darfst du <strong>keinen Wizard, keinen Narr und keinen Trumpf</strong> spielen.</li>
+            <li>Hast du die Farbe nicht → du darfst alles spielen.</li>
+          </ul>
+        </div>
+
+        <div class="rule-block">
+          <h3><span class="rule-icon">⚔️</span> Wer gewinnt den Stich?</h3>
+          <ul>
+            <li><strong>Wizard</strong> gewinnt immer.</li>
+            <li>Mehrere Wizards? → der <strong>erste gespielte</strong> gewinnt.</li>
+            <li><strong>Narr</strong> ist die schwächste Karte.</li>
+            <li>Sonst gewinnt der höchste Trumpf, oder die höchste Karte der Bedienfarbe.</li>
+            <li>Wer gewinnt, beginnt den nächsten Stich.</li>
+          </ul>
+        </div>
+
+        <div class="rule-block">
+          <h3><span class="rule-icon">🏆</span> Punkte</h3>
+          <div class="score-cards">
+            <div class="score-card score-hit">
+              <div class="score-card-label">Tipp exakt getroffen</div>
+              <div class="score-card-val">+20 <span>Grundpunkte</span></div>
+              <div class="score-card-val">+10 <span>pro Stich</span></div>
+            </div>
+            <div class="score-card score-miss">
+              <div class="score-card-label">Tipp daneben</div>
+              <div class="score-card-val">−10 <span>pro Abweichung</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rule-block">
+          <h3><span class="rule-icon">💡</span> Kurze Beispiele</h3>
+          <div class="examples">
+            <div class="example example-good">
+              <div class="example-text"><strong>Du sagst 2</strong> — und machst <strong>2</strong></div>
+              <div class="example-points">+40 Punkte</div>
+            </div>
+            <div class="example example-bad">
+              <div class="example-text"><strong>Du sagst 3</strong> — und machst <strong>2</strong></div>
+              <div class="example-points">−10 Punkte</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button id="rules-got-it" class="btn btn-gold">Alles klar — los geht's!</button>
+      </div>
     </div>
   </div>
 

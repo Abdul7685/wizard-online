@@ -93,8 +93,39 @@ $("chat-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const text = $("chat-input").value.trim();
   if (!text) return;
-  socket.emit("chat_message", { text });
+  sendChat(text);
   $("chat-input").value = "";
+});
+
+function sendChat(text) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return;
+  socket.emit("chat_message", { text: trimmed });
+}
+
+// Quick-reactions & emoji bar
+document.querySelectorAll(".quick-chip").forEach((btn) => {
+  btn.addEventListener("click", () => sendChat(btn.dataset.msg));
+});
+document.querySelectorAll(".emoji-chip").forEach((btn) => {
+  btn.addEventListener("click", () => sendChat(btn.dataset.emoji));
+});
+
+// Rules modal
+function openRulesModal() { $("rules-modal").classList.remove("hidden"); }
+function closeRulesModal() { $("rules-modal").classList.add("hidden"); }
+$("rules-btn").addEventListener("click", openRulesModal);
+$("rules-btn-game").addEventListener("click", openRulesModal);
+$("rules-modal-close").addEventListener("click", closeRulesModal);
+$("rules-got-it").addEventListener("click", closeRulesModal);
+$("rules-modal").addEventListener("click", (e) => {
+  if (e.target.id === "rules-modal") closeRulesModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeRulesModal();
+    closeRoundModal();
+  }
 });
 
 // ---- Server-Events ----
@@ -140,11 +171,43 @@ socket.on("your_hand", ({ hand, blind_view, legal_moves }) => {
 socket.on("chat", (msg) => {
   const line = document.createElement("div");
   line.className = "chat-msg";
-  line.innerHTML = `<span class="from">${escapeHtml(msg.from)}</span><span class="text">${escapeHtml(msg.text)}</span>`;
+
+  const isMine = msg.from === state.name;
+  if (isMine) line.classList.add("mine");
+
+  if (isEmojiOnly(msg.text)) line.classList.add("emoji-only");
+
+  const fromClass = isMine ? "chat-from-mine" : `chat-from-${chatColorIndex(msg.from)}`;
+  line.innerHTML =
+    `<span class="from ${fromClass}">${escapeHtml(msg.from)}</span>` +
+    `<span class="text">${escapeHtml(msg.text)}</span>`;
+
   const log = $("chat-log");
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
 });
+
+function chatColorIndex(name) {
+  // Stable color per player name across the session
+  if (state.gameState) {
+    const p = state.gameState.players.find((x) => x.name === name);
+    if (p) {
+      const idx = state.playerOrderIndex.get(p.id);
+      if (idx !== undefined) return idx % 6;
+    }
+  }
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return Math.abs(h) % 6;
+}
+
+function isEmojiOnly(text) {
+  if (!text) return false;
+  const stripped = text.replace(/\s+/g, "");
+  if (stripped.length === 0 || stripped.length > 6) return false;
+  // Heuristic: no ASCII letters/digits → treat as emoji-only
+  return !/[A-Za-z0-9]/.test(stripped);
+}
 
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, (c) =>
