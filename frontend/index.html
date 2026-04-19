@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wizard Online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="bg-stars"></div>
+
+  <!-- LOBBY -->
+  <div id="lobby" class="lobby-screen">
+    <div class="lobby-card">
+      <div class="brand">
+        <div class="brand-icon">✦</div>
+        <h1 class="brand-title">Wizard</h1>
+        <div class="brand-sub">Online spielen mit Freunden</div>
+      </div>
+
+      <label class="field">
+        <span>Dein Name</span>
+        <input id="name-input" type="text" maxlength="20" placeholder="z.B. Abdul" autocomplete="off" />
+      </label>
+
+      <button id="create-btn" class="btn btn-primary btn-lg">
+        <span class="btn-icon">+</span> Neuen Raum erstellen
+      </button>
+
+      <div class="divider"><span>oder beitreten</span></div>
+
+      <div class="join-row">
+        <input id="room-input" type="text" maxlength="6" placeholder="RAUM-CODE" autocomplete="off" />
+        <button id="join-btn" class="btn btn-secondary">Beitreten</button>
+      </div>
+
+      <p class="error" id="lobby-error"></p>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="game" class="game-screen hidden">
+    <header class="topbar">
+      <div class="topbar-brand">
+        <span class="brand-icon-sm">✦</span>
+        <span>Wizard</span>
+      </div>
+      <div class="room-badge">
+        <span class="room-label">Raum</span>
+        <span id="room-info" class="room-code"></span>
+        <button id="copy-room" class="btn-icon-only" title="Kopieren">⎘</button>
+      </div>
+    </header>
+
+    <main class="game-grid">
+      <section class="panel players-panel">
+        <div class="panel-title">Spieler</div>
+        <div id="players-list"></div>
+      </section>
+
+      <section class="panel table-panel">
+        <div class="phase-banner">
+          <div id="phase-info"></div>
+          <div id="trump-info"></div>
+        </div>
+
+        <div class="trick-zone">
+          <div class="trick-label">Aktueller Stich</div>
+          <div id="current-trick" class="trick-cards"></div>
+        </div>
+
+        <div id="action-area" class="action-zone"></div>
+      </section>
+
+      <section class="panel chat-panel">
+        <div class="panel-title">Chat</div>
+        <div id="chat-log"></div>
+        <form id="chat-form">
+          <input id="chat-input" type="text" maxlength="200" placeholder="Nachricht..." autocomplete="off" />
+          <button type="submit" class="btn btn-sm btn-primary">Senden</button>
+        </form>
+      </section>
+
+      <section class="panel hand-panel">
+        <div class="panel-title">Deine Karten</div>
+        <div id="my-hand" class="hand-cards"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"
+    integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO"
+    crossorigin="anonymous"></script>
+  <script src="/static/card.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
