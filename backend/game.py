@@ -193,6 +193,9 @@ class WizardGame:
         if not is_legal_play(card, player.hand, lead_suit):
             raise GameError("Ungültiger Zug: du musst die Bedienfarbe spielen.")
 
+        if not self.current_trick:
+            self.last_completed_trick = None
+
         player.hand.remove(card)
         self.current_trick.append(TrickPlay(player_id=player_id, card=card))
 
@@ -223,6 +226,14 @@ class WizardGame:
 
         self.tricks_played_this_round += 1
         self.last_trick_winner_id = winner_id
+        self.last_completed_trick = {
+            "winner_id": winner_id,
+            "winner_name": winner.name,
+            "plays": [
+                {"player_id": tp.player_id, "card": card_to_dict(tp.card)}
+                for tp in self.current_trick
+            ],
+        }
         self.current_trick = []
 
         if self.tricks_played_this_round == self.round_number:
@@ -273,6 +284,9 @@ class WizardGame:
             "phase": self.phase.value,
             "round": self.round_number,
             "total_rounds": self.total_rounds(),
+            "trick_of_round": self.tricks_played_this_round + (1 if self.current_trick else 0),
+            "tricks_in_round": self.round_number,
+            "last_completed_trick": self.last_completed_trick,
             "start_player": (
                 self.players[self.start_player_index].id if self.players else None
             ),
@@ -295,6 +309,7 @@ class WizardGame:
                     "tricks": p.tricks_this_round,
                     "score": p.total_score,
                     "hand_size": len(p.hand),
+                    "scores_per_round": list(p.scores_per_round),
                 }
                 for p in self.players
             ],

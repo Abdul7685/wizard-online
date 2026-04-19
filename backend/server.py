@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.cards import card_from_dict
-from backend.game import WizardGame, GameError
+from backend.game import WizardGame, GameError, Phase
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
@@ -30,15 +30,20 @@ sid_to_room: dict[str, str] = {}
 
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
-app = FastAPI()
+fastapi_app = FastAPI()
 
 
-@app.get("/")
+@fastapi_app.get("/")
 async def index() -> FileResponse:
     return FileResponse(FRONTEND_DIR / "index.html")
 
 
-app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+@fastapi_app.get("/health")
+async def health() -> dict:
+    return {"status": "ok", "rooms": len(rooms)}
+
+
+fastapi_app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 
 async def broadcast_room(room: Room) -> None:
@@ -217,10 +222,12 @@ def _room_of(sid: str) -> Optional[Room]:
     return rooms.get(room_id)
 
 
-asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)
+app = socketio.ASGIApp(sio, other_asgi_app=fastapi_app)
 
 
 if __name__ == "__main__":
+    import os
     import uvicorn
 
-    uvicorn.run("server:asgi_app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("backend.server:app", host="0.0.0.0", port=port, reload=True)
