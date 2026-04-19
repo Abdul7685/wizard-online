@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
-from backend.cards import(
+from cards import (
     Card,
     CardType,
     Suit,

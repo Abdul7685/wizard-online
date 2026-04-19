@@ -11,8 +11,8 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from cards import card_from_dict
-from game import GameError, Phase, WizardGame
+from backend.cards import card_from_dict
+from backend.game import WizardGame, GameError
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
