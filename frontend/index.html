@@ -64,6 +64,10 @@
         <button id="join-btn" class="btn btn-secondary">Beitreten</button>
       </div>
 
+      <button id="browse-rooms-btn" class="btn btn-ghost btn-browse">
+        <span class="btn-icon">🔍</span> Verfügbare Räume durchsuchen
+      </button>
+
       <p class="error" id="lobby-error"></p>
 
       <button id="rules-btn" class="btn btn-ghost btn-rules">
@@ -201,6 +205,25 @@
         </table>
       </div>
       <div class="modal-footer" id="round-modal-footer"></div>
+    </div>
+  </div>
+
+  <!-- Rooms browser modal -->
+  <div id="rooms-modal" class="modal-overlay hidden">
+    <div class="modal-card rooms-card">
+      <div class="modal-header">
+        <h2>🔍 Verfügbare Räume</h2>
+        <button id="rooms-modal-close" class="modal-close" title="Schließen">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="rooms-list" class="rooms-list">
+          <div class="rooms-empty">Lade Räume…</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="rooms-refresh" class="btn btn-secondary">↻ Aktualisieren</button>
+        <button id="rooms-close-bottom" class="btn btn-primary">Schließen</button>
+      </div>
     </div>
   </div>
 

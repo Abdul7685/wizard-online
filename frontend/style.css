@@ -218,6 +218,118 @@ input[type="text"]:focus {
   letter-spacing: 0.03em;
 }
 
+.btn-browse {
+  width: 100%;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  padding: 0.7rem 1rem;
+  letter-spacing: 0.03em;
+}
+
+/* ---- Rooms browser ---- */
+
+.rooms-card { max-width: 560px; }
+
+.rooms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.rooms-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 1.5rem 0;
+  font-style: italic;
+}
+
+.room-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem 0.9rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+.room-row.joinable { cursor: pointer; }
+.room-row.joinable:hover {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.18), rgba(167, 139, 250, 0.08));
+  border-color: var(--purple-light);
+  transform: translateY(-1px);
+}
+.room-row.locked { opacity: 0.55; }
+
+.room-code-pill {
+  font-family: "Cinzel", serif;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  padding: 0.3rem 0.7rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.room-info-col { min-width: 0; }
+.room-players-line {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.room-players-line strong { color: var(--text); }
+
+.room-count {
+  font-family: "Cinzel", serif;
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.95rem;
+  min-width: 48px;
+  text-align: center;
+}
+
+.room-status {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+}
+.room-status.lobby { background: rgba(16, 185, 129, 0.18); color: var(--green); }
+.room-status.ingame { background: rgba(239, 68, 68, 0.15); color: #ff8b8b; }
+.room-status.full { background: rgba(234, 179, 8, 0.15); color: #fbbf24; }
+
+/* ---- Offline-Indikator im Spiel ---- */
+.player-chip.offline {
+  opacity: 0.55;
+  border-style: dashed;
+}
+.player-chip.offline .player-avatar {
+  filter: grayscale(0.8);
+}
+.offline-pill {
+  position: absolute;
+  bottom: -6px;
+  left: 8px;
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
 .btn-gold {
   background: linear-gradient(135deg, var(--accent), var(--accent-deep));
   color: #1a0f00;
@@ -255,9 +367,11 @@ input[type="text"]:focus {
 .game-screen {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .topbar {
@@ -386,14 +500,16 @@ input[type="text"]:focus {
 /* Layout: players left narrow, table big center, chat right narrow, hand full bottom */
 .game-grid {
   display: grid;
-  grid-template-columns: 240px 1fr 260px;
-  grid-template-rows: 1fr auto;
+  grid-template-columns: 240px minmax(0, 1fr) 260px;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 0.9rem;
   padding: 0.9rem;
   flex: 1;
+  min-height: 0;
   max-width: 1800px;
   margin: 0 auto;
   width: 100%;
+  overflow: hidden;
 }
 .players-panel { grid-column: 1; grid-row: 1; }
 .table-panel   { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; gap: 0.75rem; }
@@ -413,8 +529,10 @@ input[type="text"]:focus {
 @media (max-width: 700px) {
   .topbar { flex-wrap: wrap; }
   .status-bar { order: 3; width: 100%; justify-content: flex-start; }
-  .game-grid { grid-template-columns: 1fr; }
+  .game-grid { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(0, auto); }
   .players-panel, .chat-panel, .table-panel, .hand-panel { grid-column: 1; }
+  .chat-panel { max-height: 240px; transition: max-height 0.2s ease; }
+  .chat-panel.collapsed { max-height: 48px; }
   .chat-panel.collapsed .chat-body { display: none; }
 }
 
@@ -425,7 +543,11 @@ input[type="text"]:focus {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1rem;
+  min-height: 0;
+  overflow: hidden;
 }
+
+.players-panel { overflow-y: auto; }
 
 .panel-title {
   font-size: 0.72rem;
@@ -797,8 +919,16 @@ input[type="text"]:focus {
 
 /* ---- Chat ---- */
 
-.chat-panel { min-height: 360px; }
-.chat-header { display: flex; align-items: center; justify-content: space-between; }
+/* Chat is a fixed-width column that NEVER pushes the game layout.
+   It fills its grid cell, internal areas scroll. */
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.chat-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 .chat-toggle {
   background: none;
   border: none;
@@ -809,12 +939,20 @@ input[type="text"]:focus {
 }
 .chat-toggle:hover { color: var(--text); }
 
-.chat-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.chat-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
 
 #chat-log {
-  flex: 1;
-  min-height: 160px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -825,6 +963,11 @@ input[type="text"]:focus {
   flex-direction: column;
   gap: 0.35rem;
 }
+
+/* Footer parts of chat shouldn't shrink */
+#chat-form,
+.quick-reactions,
+.emoji-bar { flex-shrink: 0; }
 
 .chat-msg {
   display: flex;
@@ -964,6 +1107,12 @@ input[type="text"]:focus {
 .card {
   --card-w: 90px;
   --card-h: 130px;
+  --card-pad: 8px;
+  --card-corner-fs: 0.95rem;
+  --card-corner-num-fs: 1rem;
+  --card-corner-sym-fs: 0.85rem;
+  --card-center-fs: 2.4rem;
+  --card-center-special-fs: 2.2rem;
   width: var(--card-w);
   height: var(--card-h);
   border-radius: 10px;
@@ -971,25 +1120,28 @@ input[type="text"]:focus {
   color: #222;
   display: flex;
   flex-direction: column;
-  padding: 8px;
+  padding: var(--card-pad);
   position: relative;
   box-shadow: var(--shadow-card);
   user-select: none;
   font-family: "Cinzel", serif;
   border: 1px solid rgba(0, 0, 0, 0.1);
   transition: transform 0.18s, box-shadow 0.18s, filter 0.2s;
+  overflow: hidden;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .card .corner {
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-size: 0.95rem;
+  font-size: var(--card-corner-fs);
   font-weight: 700;
   line-height: 1;
 }
-.card .corner .num { font-size: 1rem; }
-.card .corner .sym { font-size: 0.85rem; margin-top: 1px; }
+.card .corner .num { font-size: var(--card-corner-num-fs); line-height: 1; }
+.card .corner .sym { font-size: var(--card-corner-sym-fs); margin-top: 1px; line-height: 1; }
 .card .corner.top { align-self: flex-start; }
 .card .corner.bot {
   align-self: flex-end;
@@ -999,13 +1151,15 @@ input[type="text"]:focus {
 
 .card .center {
   flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.4rem;
+  font-size: var(--card-center-fs);
   font-weight: 600;
   line-height: 1;
   margin: 0 -2px;
+  overflow: hidden;
 }
 
 .card.red    { color: var(--red);    background: linear-gradient(145deg, #fff0f0, #ffd9d9); }
@@ -1019,14 +1173,14 @@ input[type="text"]:focus {
   border: 1px solid var(--accent);
   box-shadow: var(--shadow-card), 0 0 20px rgba(212, 175, 55, 0.3);
 }
-.card.wizard .center { font-size: 2.2rem; }
+.card.wizard .center { font-size: var(--card-center-special-fs); }
 
 .card.jester {
   background: linear-gradient(145deg, #8b4513, #d97706 50%, #8b4513);
   color: #fff;
   border: 1px solid #fbbf24;
 }
-.card.jester .center { font-size: 2.2rem; }
+.card.jester .center { font-size: var(--card-center-special-fs); }
 
 /* Hand card states */
 .card.clickable { cursor: pointer; }
@@ -1063,13 +1217,39 @@ input[type="text"]:focus {
   transform: translateY(-22px) scale(1.04);
 }
 
-.card.small { --card-w: 60px; --card-h: 88px; font-size: 0.8rem; }
-.card.small .corner { font-size: 0.7rem; }
-.card.small .center { font-size: 1.5rem; }
+.card.small {
+  --card-w: 60px;
+  --card-h: 88px;
+  --card-pad: 5px;
+  --card-corner-fs: 0.65rem;
+  --card-corner-num-fs: 0.7rem;
+  --card-corner-sym-fs: 0.58rem;
+  --card-center-fs: 1.4rem;
+  --card-center-special-fs: 1.2rem;
+}
 
-.card.tiny { --card-w: 42px; --card-h: 60px; }
-.card.tiny .corner { font-size: 0.55rem; }
-.card.tiny .center { font-size: 1rem; }
+.card.tiny {
+  --card-w: 42px;
+  --card-h: 60px;
+  --card-pad: 3px;
+  --card-corner-fs: 0.5rem;
+  --card-corner-num-fs: 0.55rem;
+  --card-corner-sym-fs: 0.44rem;
+  --card-center-fs: 1rem;
+  --card-center-special-fs: 0.85rem;
+}
+
+.card.micro {
+  --card-w: 34px;
+  --card-h: 48px;
+  --card-pad: 2px;
+  --card-corner-fs: 0.42rem;
+  --card-corner-num-fs: 0.46rem;
+  --card-corner-sym-fs: 0.38rem;
+  --card-center-fs: 0.82rem;
+  --card-center-special-fs: 0.72rem;
+  border-radius: 6px;
+}
 
 .card-back {
   background: repeating-linear-gradient(45deg, #4c1d95, #4c1d95 10px, #5b21b6 10px, #5b21b6 20px);

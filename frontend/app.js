@@ -2,16 +2,86 @@
 
 const socket = io(window.location.origin, {
   transports: ["websocket", "polling"],
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 800,
+  reconnectionDelayMax: 4000,
 });
+
+const SESSION_KEY = "wizard.session.v1";
+
+function saveSession() {
+  if (state.roomId && state.name) {
+    try {
+      localStorage.setItem(
+        SESSION_KEY,
+        JSON.stringify({
+          roomId: state.roomId,
+          playerId: state.playerId,
+          name: state.name,
+        }),
+      );
+    } catch (e) {}
+  }
+}
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+}
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
 
 socket.on("connect", () => {
   console.log("[socket] connected", socket.id);
+  // If we already have credentials (e.g. after a brief disconnect), reattach.
+  if (state.roomId && (state.playerId || state.name)) {
+    console.log("[socket] auto-rejoin", state.roomId, state.playerId, state.name);
+    socket.emit("rejoin", {
+      room_id: state.roomId,
+      player_id: state.playerId,
+      name: state.name,
+    });
+    toast("Wieder verbunden", "info", 1600);
+  } else {
+    // First load: maybe we have a session from a previous visit (localStorage)
+    const sess = loadSession();
+    if (sess && sess.roomId && (sess.playerId || sess.name)) {
+      state.name = sess.name;
+      state.roomId = sess.roomId;
+      state.playerId = sess.playerId;
+      // Pre-fill name input so user sees what was restored
+      if ($("name-input") && sess.name) $("name-input").value = sess.name;
+      console.log("[socket] resume session", sess);
+      socket.emit("rejoin", {
+        room_id: sess.roomId,
+        player_id: sess.playerId,
+        name: sess.name,
+      });
+    }
+  }
 });
 socket.on("disconnect", (reason) => {
   console.warn("[socket] disconnected:", reason);
+  if (state.roomId) toast("Verbindung verloren — versuche neu zu verbinden…", "error", 2400);
 });
 socket.on("connect_error", (err) => {
   console.error("[socket] connect_error:", err.message);
+});
+socket.on("rejoin_failed", ({ reason }) => {
+  console.warn("[socket] rejoin_failed:", reason);
+  clearSession();
+  state.roomId = null;
+  state.playerId = null;
+  $("game").classList.add("hidden");
+  $("lobby").classList.remove("hidden");
+  setLobbyError(
+    reason === "no_room"
+      ? "Der Raum existiert nicht mehr (Server wurde evtl. neu gestartet)."
+      : "Du bist nicht mehr im Raum. Bitte neu beitreten.",
+  );
 });
 
 const state = {
@@ -125,6 +195,88 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closeRulesModal();
     closeRoundModal();
+    closeRoomsModal();
+  }
+});
+
+// Rooms browser modal
+let roomsRefreshTimer = null;
+
+function openRoomsModal() {
+  $("rooms-modal").classList.remove("hidden");
+  refreshRoomsList();
+  // Auto-refresh every 4s while open
+  roomsRefreshTimer = setInterval(refreshRoomsList, 4000);
+}
+function closeRoomsModal() {
+  $("rooms-modal").classList.add("hidden");
+  if (roomsRefreshTimer) {
+    clearInterval(roomsRefreshTimer);
+    roomsRefreshTimer = null;
+  }
+}
+function refreshRoomsList() {
+  socket.emit("list_rooms", {});
+}
+
+$("browse-rooms-btn").addEventListener("click", openRoomsModal);
+$("rooms-modal-close").addEventListener("click", closeRoomsModal);
+$("rooms-close-bottom").addEventListener("click", closeRoomsModal);
+$("rooms-refresh").addEventListener("click", refreshRoomsList);
+$("rooms-modal").addEventListener("click", (e) => {
+  if (e.target.id === "rooms-modal") closeRoomsModal();
+});
+
+socket.on("rooms_list", ({ rooms }) => {
+  const list = $("rooms-list");
+  list.innerHTML = "";
+  if (!rooms || rooms.length === 0) {
+    list.innerHTML = `<div class="rooms-empty">Aktuell keine Räume offen.<br>Erstelle einen neuen Raum oben!</div>`;
+    return;
+  }
+  for (const r of rooms) {
+    const row = document.createElement("div");
+    const isFull = r.players >= r.max_players;
+    const inGame = r.status === "ingame";
+    const joinable = r.joinable;
+    row.className = "room-row " + (joinable ? "joinable" : "locked");
+
+    const code = document.createElement("div");
+    code.className = "room-code-pill";
+    code.textContent = r.room_id;
+    row.appendChild(code);
+
+    const info = document.createElement("div");
+    info.className = "room-info-col";
+    const names = (r.player_names || []).join(", ") || "—";
+    info.innerHTML = `<div class="room-players-line"><strong>${escapeHtml(names)}</strong></div>`;
+    row.appendChild(info);
+
+    const count = document.createElement("div");
+    count.className = "room-count";
+    count.textContent = `${r.players}/${r.max_players}`;
+    row.appendChild(count);
+
+    const status = document.createElement("div");
+    status.className = "room-status " + (inGame ? "ingame" : isFull ? "full" : "lobby");
+    status.textContent = inGame ? "Läuft" : isFull ? "Voll" : "Offen";
+    row.appendChild(status);
+
+    if (joinable) {
+      row.addEventListener("click", () => {
+        const name = $("name-input").value.trim();
+        if (!name) {
+          toast("Bitte zuerst deinen Namen eingeben.", "error", 2400);
+          closeRoomsModal();
+          $("name-input").focus();
+          return;
+        }
+        state.name = name;
+        socket.emit("join_room", { name, room_id: r.room_id });
+        closeRoomsModal();
+      });
+    }
+    list.appendChild(row);
   }
 });
 
@@ -133,6 +285,7 @@ document.addEventListener("keydown", (e) => {
 socket.on("room_created", ({ room_id }) => {
   state.roomId = room_id;
   $("room-info").textContent = room_id;
+  saveSession();
   showGame();
 });
 
@@ -141,6 +294,7 @@ socket.on("joined", ({ room_id, player_id, name }) => {
   state.playerId = player_id;
   state.name = name;
   $("room-info").textContent = room_id;
+  saveSession();
   showGame();
 });
 
@@ -183,8 +337,13 @@ socket.on("chat", (msg) => {
     `<span class="text">${escapeHtml(msg.text)}</span>`;
 
   const log = $("chat-log");
+  // Stick-to-bottom only if the user was already at the bottom (so we don't
+  // jerk them away mid-scroll-back when older messages arrive).
+  const wasAtBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   log.appendChild(line);
-  log.scrollTop = log.scrollHeight;
+  // Cap message count to keep DOM small (and prevent ballooning memory).
+  while (log.childElementCount > 200) log.removeChild(log.firstChild);
+  if (wasAtBottom || isMine) log.scrollTop = log.scrollHeight;
 });
 
 function chatColorIndex(name) {
@@ -451,6 +610,7 @@ function renderPlayers(gs) {
       chip.classList.add(`phase-${gs.phase}`);
       if (p.id === state.playerId) chip.classList.add("is-me");
     }
+    if (p.is_online === false) chip.classList.add("offline");
 
     const idx = state.playerOrderIndex.get(p.id) ?? 0;
     const avatar = document.createElement("div");
@@ -501,6 +661,13 @@ function renderPlayers(gs) {
       badge.className = "dealer-badge";
       badge.textContent = "START";
       chip.appendChild(badge);
+    }
+
+    if (p.is_online === false) {
+      const offlinePill = document.createElement("div");
+      offlinePill.className = "offline-pill";
+      offlinePill.textContent = "Offline";
+      chip.appendChild(offlinePill);
     }
 
     if (lastWinner === p.id && gs.phase === "playing" && gs.current_trick.length === 0) {

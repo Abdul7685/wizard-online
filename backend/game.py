@@ -46,6 +46,7 @@ class Player:
     tricks_this_round: int = 0
     total_score: int = 0
     scores_per_round: list[int] = field(default_factory=list)
+    is_online: bool = True
 
 
 @dataclass
@@ -310,6 +311,7 @@ class WizardGame:
                     "score": p.total_score,
                     "hand_size": len(p.hand),
                     "scores_per_round": list(p.scores_per_round),
+                    "is_online": p.is_online,
                 }
                 for p in self.players
             ],
