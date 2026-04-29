@@ -1,5 +1,5 @@
 // Wizard-Online Client (Hausregeln).
-const APP_VERSION = "v9";
+const APP_VERSION = "v10";
 console.log(`[wizard] frontend ${APP_VERSION} loaded`);
 
 const socket = io(window.location.origin, {
