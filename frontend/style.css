@@ -920,13 +920,17 @@ input[type="text"]:focus {
 /* ---- Chat ---- */
 
 /* Chat is a fixed-width column that NEVER pushes the game layout.
-   It fills its grid cell, internal areas scroll. */
+   It fills its grid cell, internal areas scroll.
+   `contain: size layout paint` isolates it so its content can't affect
+   the surrounding grid no matter how many messages arrive. */
 .chat-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
   height: 100%;
+  max-height: 100%;
   overflow: hidden;
+  contain: layout paint;
 }
 .chat-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 .chat-toggle {
@@ -1715,12 +1719,39 @@ input[type="text"]:focus {
   #chat-form input { font-size: 0.75rem; padding: 0.35rem 0.5rem; }
 
   .hand-cards { min-height: 110px; gap: 0.3rem; padding: 0.2rem; }
-  .card { --card-w: 60px; --card-h: 86px; }
-  .card .corner { font-size: 0.7rem; }
-  .card .corner .num { font-size: 0.75rem; }
-  .card .center { font-size: 1.55rem; }
-  .card.small { --card-w: 44px; --card-h: 64px; }
-  .card.small .center { font-size: 1.1rem; }
+
+  /* Hand cards on mobile landscape: only override vars, never direct font-sizes
+     so size variants (small/tiny/micro) keep working. */
+  .card {
+    --card-w: 60px;
+    --card-h: 86px;
+    --card-pad: 4px;
+    --card-corner-fs: 0.6rem;
+    --card-corner-num-fs: 0.66rem;
+    --card-corner-sym-fs: 0.5rem;
+    --card-center-fs: 1.4rem;
+    --card-center-special-fs: 1.2rem;
+  }
+  .card.small {
+    --card-w: 44px;
+    --card-h: 64px;
+    --card-pad: 3px;
+    --card-corner-fs: 0.5rem;
+    --card-corner-num-fs: 0.55rem;
+    --card-corner-sym-fs: 0.42rem;
+    --card-center-fs: 1.05rem;
+    --card-center-special-fs: 0.9rem;
+  }
+  .card.tiny {
+    --card-w: 36px;
+    --card-h: 52px;
+    --card-pad: 2px;
+    --card-corner-fs: 0.42rem;
+    --card-corner-num-fs: 0.46rem;
+    --card-corner-sym-fs: 0.38rem;
+    --card-center-fs: 0.85rem;
+    --card-center-special-fs: 0.72rem;
+  }
 
   .trump-card-area .card.small { --card-w: 38px; --card-h: 56px; }
 }
@@ -1755,10 +1786,13 @@ input[type="text"]:focus {
 .player-chip.blind-mode .blind-peek .card {
   --card-w: 46px;
   --card-h: 66px;
+  --card-pad: 3px;
+  --card-corner-fs: 0.5rem;
+  --card-corner-num-fs: 0.55rem;
+  --card-corner-sym-fs: 0.42rem;
+  --card-center-fs: 1.05rem;
+  --card-center-special-fs: 0.9rem;
 }
-.player-chip.blind-mode .blind-peek .card .corner { font-size: 0.62rem; }
-.player-chip.blind-mode .blind-peek .card .corner .num { font-size: 0.7rem; }
-.player-chip.blind-mode .blind-peek .card .center { font-size: 1.1rem; }
 
 /* Own chip in blind round: show hidden card backs smaller too */
 .player-chip.blind-mode.is-me { opacity: 0.85; }
@@ -1767,12 +1801,15 @@ input[type="text"]:focus {
 @media (max-height: 560px) and (orientation: landscape),
        (max-width: 900px) and (orientation: landscape) {
   .player-chip.blind-mode .blind-peek .card {
-    --card-w: 36px;
-    --card-h: 52px;
+    --card-w: 38px;
+    --card-h: 56px;
+    --card-pad: 2px;
+    --card-corner-fs: 0.42rem;
+    --card-corner-num-fs: 0.46rem;
+    --card-corner-sym-fs: 0.36rem;
+    --card-center-fs: 0.85rem;
+    --card-center-special-fs: 0.7rem;
   }
-  .player-chip.blind-mode .blind-peek .card .corner { font-size: 0.5rem; }
-  .player-chip.blind-mode .blind-peek .card .corner .num { font-size: 0.56rem; }
-  .player-chip.blind-mode .blind-peek .card .center { font-size: 0.85rem; }
   /* Hide Gewonnen during blind bidding (always 0) to reduce noise */
   .player-chip.blind-mode.phase-bidding .pstat.stat-won { display: none; }
 }

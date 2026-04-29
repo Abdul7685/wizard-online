@@ -1,4 +1,6 @@
 // Wizard-Online Client (Hausregeln).
+const APP_VERSION = "v8";
+console.log(`[wizard] frontend ${APP_VERSION} loaded`);
 
 const socket = io(window.location.origin, {
   transports: ["websocket", "polling"],
@@ -35,7 +37,7 @@ function loadSession() {
 }
 
 socket.on("connect", () => {
-  console.log("[socket] connected", socket.id);
+  console.log("[socket] connected", socket.id, "version", APP_VERSION);
   // If we already have credentials (e.g. after a brief disconnect), reattach.
   if (state.roomId && (state.playerId || state.name)) {
     console.log("[socket] auto-rejoin", state.roomId, state.playerId, state.name);
@@ -55,6 +57,8 @@ socket.on("connect", () => {
       // Pre-fill name input so user sees what was restored
       if ($("name-input") && sess.name) $("name-input").value = sess.name;
       console.log("[socket] resume session", sess);
+      // Show a brief reconnect spinner instead of the bare lobby
+      setLobbyError("Verbinde dich wieder mit dem Spiel…");
       socket.emit("rejoin", {
         room_id: sess.roomId,
         player_id: sess.playerId,
@@ -295,6 +299,7 @@ socket.on("joined", ({ room_id, player_id, name }) => {
   state.name = name;
   $("room-info").textContent = room_id;
   saveSession();
+  setLobbyError("");
   showGame();
 });
 
