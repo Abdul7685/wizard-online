@@ -21,14 +21,12 @@ function cardElement(card, { onClick = null, disabled = false, small = false } =
     el.innerHTML = `
       <div class="corner top"><span class="num">Z</span></div>
       <div class="center">\u2728</div>
-      <div class="corner bot"><span class="num">Z</span></div>
     `;
   } else if (card.type === "jester") {
     el.classList.add("jester");
     el.innerHTML = `
       <div class="corner top"><span class="num">N</span></div>
       <div class="center">\u{1F921}</div>
-      <div class="corner bot"><span class="num">N</span></div>
     `;
   } else {
     el.classList.add(card.suit);
@@ -36,7 +34,6 @@ function cardElement(card, { onClick = null, disabled = false, small = false } =
     el.innerHTML = `
       <div class="corner top"><span class="num">${card.value}</span><span class="sym">${sym}</span></div>
       <div class="center">${sym}</div>
-      <div class="corner bot"><span class="num">${card.value}</span><span class="sym">${sym}</span></div>
     `;
   }
 

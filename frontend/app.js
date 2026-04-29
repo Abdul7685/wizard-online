@@ -1,5 +1,5 @@
 // Wizard-Online Client (Hausregeln).
-const APP_VERSION = "v8";
+const APP_VERSION = "v9";
 console.log(`[wizard] frontend ${APP_VERSION} loaded`);
 
 const socket = io(window.location.origin, {
@@ -38,6 +38,10 @@ function loadSession() {
 
 socket.on("connect", () => {
   console.log("[socket] connected", socket.id, "version", APP_VERSION);
+  // Start lobby room polling if we're on the lobby (not in a game)
+  if (!$("lobby").classList.contains("hidden")) {
+    startLobbyRoomsPolling();
+  }
   // If we already have credentials (e.g. after a brief disconnect), reattach.
   if (state.roomId && (state.playerId || state.name)) {
     console.log("[socket] auto-rejoin", state.roomId, state.playerId, state.name);
@@ -79,8 +83,7 @@ socket.on("rejoin_failed", ({ reason }) => {
   clearSession();
   state.roomId = null;
   state.playerId = null;
-  $("game").classList.add("hidden");
-  $("lobby").classList.remove("hidden");
+  showLobby();
   setLobbyError(
     reason === "no_room"
       ? "Der Raum existiert nicht mehr (Server wurde evtl. neu gestartet)."
@@ -199,87 +202,75 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closeRulesModal();
     closeRoundModal();
-    closeRoomsModal();
   }
 });
 
-// Rooms browser modal
-let roomsRefreshTimer = null;
+// Lobby rooms — auto-refreshing inline list
+let lobbyRoomsTimer = null;
 
-function openRoomsModal() {
-  $("rooms-modal").classList.remove("hidden");
-  refreshRoomsList();
-  // Auto-refresh every 4s while open
-  roomsRefreshTimer = setInterval(refreshRoomsList, 4000);
-}
-function closeRoomsModal() {
-  $("rooms-modal").classList.add("hidden");
-  if (roomsRefreshTimer) {
-    clearInterval(roomsRefreshTimer);
-    roomsRefreshTimer = null;
+function startLobbyRoomsPolling() {
+  refreshLobbyRooms();
+  if (!lobbyRoomsTimer) {
+    lobbyRoomsTimer = setInterval(refreshLobbyRooms, 3000);
   }
 }
-function refreshRoomsList() {
-  socket.emit("list_rooms", {});
+function stopLobbyRoomsPolling() {
+  if (lobbyRoomsTimer) {
+    clearInterval(lobbyRoomsTimer);
+    lobbyRoomsTimer = null;
+  }
 }
-
-$("browse-rooms-btn").addEventListener("click", openRoomsModal);
-$("rooms-modal-close").addEventListener("click", closeRoomsModal);
-$("rooms-close-bottom").addEventListener("click", closeRoomsModal);
-$("rooms-refresh").addEventListener("click", refreshRoomsList);
-$("rooms-modal").addEventListener("click", (e) => {
-  if (e.target.id === "rooms-modal") closeRoomsModal();
-});
+function refreshLobbyRooms() {
+  if (socket.connected) socket.emit("list_rooms", {});
+}
 
 socket.on("rooms_list", ({ rooms }) => {
-  const list = $("rooms-list");
-  list.innerHTML = "";
-  if (!rooms || rooms.length === 0) {
-    list.innerHTML = `<div class="rooms-empty">Aktuell keine Räume offen.<br>Erstelle einen neuen Raum oben!</div>`;
+  const section = $("lobby-rooms-section");
+  const list = $("lobby-rooms-list");
+  if (!section || !list) return;
+
+  const open = (rooms || []).filter((r) => r.joinable);
+  if (open.length === 0) {
+    section.classList.add("hidden");
+    list.innerHTML = "";
     return;
   }
-  for (const r of rooms) {
+
+  section.classList.remove("hidden");
+  list.innerHTML = "";
+  for (const r of open) {
     const row = document.createElement("div");
-    const isFull = r.players >= r.max_players;
-    const inGame = r.status === "ingame";
-    const joinable = r.joinable;
-    row.className = "room-row " + (joinable ? "joinable" : "locked");
+    row.className = "lobby-room-row";
 
     const code = document.createElement("div");
-    code.className = "room-code-pill";
+    code.className = "lr-code";
     code.textContent = r.room_id;
     row.appendChild(code);
 
     const info = document.createElement("div");
-    info.className = "room-info-col";
+    info.className = "lr-info";
     const names = (r.player_names || []).join(", ") || "—";
-    info.innerHTML = `<div class="room-players-line"><strong>${escapeHtml(names)}</strong></div>`;
+    info.innerHTML =
+      `<div class="lr-names">${escapeHtml(names)}</div>` +
+      `<div class="lr-count">${r.players}/${r.max_players} Spieler</div>`;
     row.appendChild(info);
 
-    const count = document.createElement("div");
-    count.className = "room-count";
-    count.textContent = `${r.players}/${r.max_players}`;
-    row.appendChild(count);
+    const join = document.createElement("div");
+    join.className = "lr-join";
+    join.textContent = "Beitreten";
+    row.appendChild(join);
 
-    const status = document.createElement("div");
-    status.className = "room-status " + (inGame ? "ingame" : isFull ? "full" : "lobby");
-    status.textContent = inGame ? "Läuft" : isFull ? "Voll" : "Offen";
-    row.appendChild(status);
+    row.addEventListener("click", () => {
+      const name = $("name-input").value.trim();
+      if (!name) {
+        setLobbyError("Bitte zuerst deinen Namen eingeben.");
+        $("name-input").focus();
+        return;
+      }
+      state.name = name;
+      socket.emit("join_room", { name, room_id: r.room_id });
+    });
 
-    if (joinable) {
-      row.addEventListener("click", () => {
-        const name = $("name-input").value.trim();
-        if (!name) {
-          toast("Bitte zuerst deinen Namen eingeben.", "error", 2400);
-          closeRoomsModal();
-          $("name-input").focus();
-          return;
-        }
-        state.name = name;
-        socket.emit("join_room", { name, room_id: r.room_id });
-        closeRoomsModal();
-      });
-    }
     list.appendChild(row);
   }
 });
@@ -342,13 +333,18 @@ socket.on("chat", (msg) => {
     `<span class="text">${escapeHtml(msg.text)}</span>`;
 
   const log = $("chat-log");
+  const scroll = log.parentElement; // .chat-scroll wrapper
   // Stick-to-bottom only if the user was already at the bottom (so we don't
   // jerk them away mid-scroll-back when older messages arrive).
-  const wasAtBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  const wasAtBottom = scroll
+    ? (scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 40)
+    : true;
   log.appendChild(line);
   // Cap message count to keep DOM small (and prevent ballooning memory).
   while (log.childElementCount > 200) log.removeChild(log.firstChild);
-  if (wasAtBottom || isMine) log.scrollTop = log.scrollHeight;
+  if (scroll && (wasAtBottom || isMine)) {
+    scroll.scrollTop = scroll.scrollHeight;
+  }
 });
 
 function chatColorIndex(name) {
@@ -432,6 +428,13 @@ function handleTransitions(prev, gs) {
 function showGame() {
   $("lobby").classList.add("hidden");
   $("game").classList.remove("hidden");
+  stopLobbyRoomsPolling();
+}
+
+function showLobby() {
+  $("game").classList.add("hidden");
+  $("lobby").classList.remove("hidden");
+  startLobbyRoomsPolling();
 }
 
 function render() {

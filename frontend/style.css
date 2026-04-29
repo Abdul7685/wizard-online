@@ -226,6 +226,76 @@ input[type="text"]:focus {
   letter-spacing: 0.03em;
 }
 
+/* ---- Inline rooms list in lobby ---- */
+
+.lobby-rooms-section { margin-top: 0.5rem; }
+
+.lobby-rooms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.lobby-room-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(167, 139, 250, 0.05));
+  border: 1.5px solid rgba(167, 139, 250, 0.3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.lobby-room-row:hover {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.25), rgba(167, 139, 250, 0.15));
+  border-color: var(--purple-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.lobby-room-row .lr-code {
+  font-family: "Cinzel", serif;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  font-size: 0.95rem;
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+}
+
+.lobby-room-row .lr-info {
+  min-width: 0;
+}
+.lobby-room-row .lr-names {
+  font-size: 0.8rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.lobby-room-row .lr-count {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-top: 1px;
+}
+
+.lobby-room-row .lr-join {
+  font-family: "Cinzel", serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--green);
+  text-transform: uppercase;
+  padding: 0.3rem 0.7rem;
+  background: rgba(16, 185, 129, 0.15);
+  border-radius: 999px;
+}
+
 /* ---- Rooms browser ---- */
 
 .rooms-card { max-width: 560px; }
@@ -946,13 +1016,15 @@ input[type="text"]:focus {
 .chat-body {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
 }
 
-#chat-log {
-  flex: 1 1 auto;
+/* This wrapper has the scroll. It fills the remaining space and clips
+   any overflow. Whatever you put in #chat-log can't push past this. */
+.chat-scroll {
+  flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -962,13 +1034,21 @@ input[type="text"]:focus {
   border-radius: var(--radius-sm);
   padding: 0.6rem;
   margin-bottom: 0.4rem;
-  font-size: 0.85rem;
+}
+
+#chat-log {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  font-size: 0.85rem;
 }
 
-/* Footer parts of chat shouldn't shrink */
+/* Footer is fixed-size, never grows */
+.chat-footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+}
 #chat-form,
 .quick-reactions,
 .emoji-bar { flex-shrink: 0; }

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css?v=8" />
+  <link rel="stylesheet" href="/static/style.css?v=9" />
 </head>
 <body>
   <div class="bg-stars"></div>
@@ -57,16 +57,17 @@
         <span class="btn-icon">+</span> Neuen Raum erstellen
       </button>
 
-      <div class="divider"><span>oder beitreten</span></div>
+      <div id="lobby-rooms-section" class="lobby-rooms-section hidden">
+        <div class="divider"><span>offene Räume</span></div>
+        <div id="lobby-rooms-list" class="lobby-rooms-list"></div>
+      </div>
+
+      <div class="divider"><span>oder mit Code beitreten</span></div>
 
       <div class="join-row">
         <input id="room-input" type="text" maxlength="6" placeholder="RAUM-CODE" autocomplete="off" />
         <button id="join-btn" class="btn btn-secondary">Beitreten</button>
       </div>
-
-      <button id="browse-rooms-btn" class="btn btn-ghost btn-browse">
-        <span class="btn-icon">🔍</span> Verfügbare Räume durchsuchen
-      </button>
 
       <p class="error" id="lobby-error"></p>
 
@@ -142,37 +143,41 @@
           <button id="chat-toggle" class="chat-toggle" title="Ein-/Ausklappen">▾</button>
         </div>
         <div class="chat-body">
-          <div id="chat-log"></div>
-          <div id="quick-reactions" class="quick-reactions">
-            <button class="quick-chip" data-msg="Nice!">Nice!</button>
-            <button class="quick-chip" data-msg="Nooo 😭">Nooo 😭</button>
-            <button class="quick-chip" data-msg="Easy 😎">Easy 😎</button>
-            <button class="quick-chip" data-msg="Glück gehabt 🍀">Glück 🍀</button>
-            <button class="quick-chip" data-msg="Was war das 😂">Was war das 😂</button>
-            <button class="quick-chip" data-msg="GG!">GG!</button>
-            <button class="quick-chip" data-msg="Ich hab's gewusst 😏">Gewusst 😏</button>
-            <button class="quick-chip" data-msg="Rip 💀">Rip 💀</button>
-            <button class="quick-chip" data-msg="All-in 😈">All-in 😈</button>
-            <button class="quick-chip" data-msg="Bruder… 🤦‍♂️">Bruder 🤦‍♂️</button>
+          <div class="chat-scroll">
+            <div id="chat-log"></div>
           </div>
-          <div id="emoji-bar" class="emoji-bar">
-            <button class="emoji-chip" data-emoji="😄">😄</button>
-            <button class="emoji-chip" data-emoji="😂">😂</button>
-            <button class="emoji-chip" data-emoji="😭">😭</button>
-            <button class="emoji-chip" data-emoji="😎">😎</button>
-            <button class="emoji-chip" data-emoji="🤯">🤯</button>
-            <button class="emoji-chip" data-emoji="😈">😈</button>
-            <button class="emoji-chip" data-emoji="🤦‍♂️">🤦‍♂️</button>
-            <button class="emoji-chip" data-emoji="🧠">🧠</button>
-            <button class="emoji-chip" data-emoji="🔥">🔥</button>
-            <button class="emoji-chip" data-emoji="💀">💀</button>
-            <button class="emoji-chip" data-emoji="👀">👀</button>
-            <button class="emoji-chip" data-emoji="🎯">🎯</button>
+          <div class="chat-footer">
+            <div id="quick-reactions" class="quick-reactions">
+              <button class="quick-chip" data-msg="Nice!">Nice!</button>
+              <button class="quick-chip" data-msg="Nooo 😭">Nooo 😭</button>
+              <button class="quick-chip" data-msg="Easy 😎">Easy 😎</button>
+              <button class="quick-chip" data-msg="Glück gehabt 🍀">Glück 🍀</button>
+              <button class="quick-chip" data-msg="Was war das 😂">Was war das 😂</button>
+              <button class="quick-chip" data-msg="GG!">GG!</button>
+              <button class="quick-chip" data-msg="Ich hab's gewusst 😏">Gewusst 😏</button>
+              <button class="quick-chip" data-msg="Rip 💀">Rip 💀</button>
+              <button class="quick-chip" data-msg="All-in 😈">All-in 😈</button>
+              <button class="quick-chip" data-msg="Bruder… 🤦‍♂️">Bruder 🤦‍♂️</button>
+            </div>
+            <div id="emoji-bar" class="emoji-bar">
+              <button class="emoji-chip" data-emoji="😄">😄</button>
+              <button class="emoji-chip" data-emoji="😂">😂</button>
+              <button class="emoji-chip" data-emoji="😭">😭</button>
+              <button class="emoji-chip" data-emoji="😎">😎</button>
+              <button class="emoji-chip" data-emoji="🤯">🤯</button>
+              <button class="emoji-chip" data-emoji="😈">😈</button>
+              <button class="emoji-chip" data-emoji="🤦‍♂️">🤦‍♂️</button>
+              <button class="emoji-chip" data-emoji="🧠">🧠</button>
+              <button class="emoji-chip" data-emoji="🔥">🔥</button>
+              <button class="emoji-chip" data-emoji="💀">💀</button>
+              <button class="emoji-chip" data-emoji="👀">👀</button>
+              <button class="emoji-chip" data-emoji="🎯">🎯</button>
+            </div>
+            <form id="chat-form">
+              <input id="chat-input" type="text" maxlength="200" placeholder="Nachricht..." autocomplete="off" />
+              <button type="submit" class="btn btn-sm btn-primary">↵</button>
+            </form>
           </div>
-          <form id="chat-form">
-            <input id="chat-input" type="text" maxlength="200" placeholder="Nachricht..." autocomplete="off" />
-            <button type="submit" class="btn btn-sm btn-primary">↵</button>
-          </form>
         </div>
       </aside>
 
@@ -205,25 +210,6 @@
         </table>
       </div>
       <div class="modal-footer" id="round-modal-footer"></div>
-    </div>
-  </div>
-
-  <!-- Rooms browser modal -->
-  <div id="rooms-modal" class="modal-overlay hidden">
-    <div class="modal-card rooms-card">
-      <div class="modal-header">
-        <h2>🔍 Verfügbare Räume</h2>
-        <button id="rooms-modal-close" class="modal-close" title="Schließen">✕</button>
-      </div>
-      <div class="modal-body">
-        <div id="rooms-list" class="rooms-list">
-          <div class="rooms-empty">Lade Räume…</div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="rooms-refresh" class="btn btn-secondary">↻ Aktualisieren</button>
-        <button id="rooms-close-bottom" class="btn btn-primary">Schließen</button>
-      </div>
     </div>
   </div>
 
@@ -310,7 +296,7 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"
     integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO"
     crossorigin="anonymous"></script>
-  <script src="/static/card.js?v=8"></script>
-  <script src="/static/app.js?v=8"></script>
+  <script src="/static/card.js?v=9"></script>
+  <script src="/static/app.js?v=9"></script>
 </body>
 </html>
