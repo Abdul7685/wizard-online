@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import uuid
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -21,11 +23,44 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 # Grace period before a disconnected lobby player is removed (seconds).
 LOBBY_GRACE_SECONDS = 45
 
+# Rate limiting: max events per sid per window. Excess events are silently dropped.
+RATE_LIMIT_WINDOW = 1.0      # seconds
+RATE_LIMIT_MAX = 5           # events allowed within the window
+_rate_buckets: dict[str, deque] = defaultdict(lambda: deque(maxlen=RATE_LIMIT_MAX + 5))
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 log = logging.getLogger("wizard")
+
+
+def _rate_limited(sid: str) -> bool:
+    """True if this sid has hit the per-second event quota."""
+    now = time.monotonic()
+    bucket = _rate_buckets[sid]
+    while bucket and bucket[0] < now - RATE_LIMIT_WINDOW:
+        bucket.popleft()
+    if len(bucket) >= RATE_LIMIT_MAX:
+        return True
+    bucket.append(now)
+    return False
+
+
+def _log_event(event: str, sid: str, room: Optional["Room"] = None, extra: str = "") -> None:
+    """Structured per-event log: room=X player=Y event=Z round=N phase=P [extra]."""
+    if room:
+        pid = room.sid_to_player.get(sid, "—")
+        player = next((p for p in room.game.players if p.id == pid), None)
+        pname = player.name if player else pid
+        log.info(
+            "room=%s player=%s event=%s round=%d phase=%s %s",
+            room.id, pname, event,
+            room.game.round_number, room.game.phase.value,
+            extra,
+        )
+    else:
+        log.info("room=— player=— event=%s sid=%s %s", event, sid, extra)
 
 
 @dataclass
@@ -85,9 +120,13 @@ def log_room(room: Room, where: str) -> None:
 
 
 async def broadcast_room(room: Room) -> None:
-    state = room.game.public_state()
-    state["room_id"] = room.id
-    await sio.emit("game_state", state, room=room.id)
+    try:
+        state = room.game.public_state()
+        state["room_id"] = room.id
+        await sio.emit("game_state", state, room=room.id)
+    except Exception as e:
+        log.exception("broadcast public_state failed room=%s: %s", room.id, e)
+        return
     for sid, player_id in list(room.sid_to_player.items()):
         try:
             hand = room.game.hand_for(player_id)
@@ -95,95 +134,145 @@ async def broadcast_room(room: Room) -> None:
             legal_moves = room.game.legal_moves_for(player_id)
         except GameError:
             hand, blind_view, legal_moves = [], {}, []
-        await sio.emit(
-            "your_hand",
-            {"hand": hand, "blind_view": blind_view, "legal_moves": legal_moves},
-            to=sid,
-        )
+        except Exception as e:
+            log.warning("hand calc failed player=%s: %s", player_id, e)
+            hand, blind_view, legal_moves = [], {}, []
+        try:
+            await sio.emit(
+                "your_hand",
+                {"hand": hand, "blind_view": blind_view, "legal_moves": legal_moves},
+                to=sid,
+            )
+        except Exception as e:
+            log.warning("your_hand emit failed sid=%s: %s", sid, e)
 
 
 async def send_error(sid: str, msg: str) -> None:
-    await sio.emit("error_message", {"message": msg}, to=sid)
+    try:
+        await sio.emit("error_message", {"message": msg}, to=sid)
+    except Exception as e:
+        log.warning("send_error failed sid=%s: %s", sid, e)
+
+
+def safe_event(rate_limited: bool = True):
+    """Decorator: wraps a Socket.IO handler so it can NEVER crash the server.
+    - Catches every exception and logs it.
+    - Optionally applies per-sid rate limiting (silent drop on excess).
+    - Always returns None so socketio doesn't propagate.
+    """
+    def deco(fn):
+        async def wrapper(sid: str, data=None):
+            try:
+                if rate_limited and _rate_limited(sid):
+                    log.warning("rate-limited %s sid=%s", fn.__name__, sid)
+                    return
+                return await fn(sid, data)
+            except GameError as ge:
+                # Game rule violation — expected, send a friendly error to the client.
+                log.warning("%s rejected sid=%s: %s", fn.__name__, sid, ge)
+                try:
+                    await send_error(sid, str(ge))
+                except Exception:
+                    pass
+            except Exception as e:
+                # Unexpected error — log full trace, do NOT crash, do NOT propagate.
+                log.exception("%s CRASHED sid=%s: %s", fn.__name__, sid, e)
+        wrapper.__name__ = fn.__name__
+        return wrapper
+    return deco
 
 
 @sio.event
 async def connect(sid: str, environ: dict) -> None:
-    log.info("[connect] sid=%s", sid)
+    try:
+        log.info("[connect] sid=%s", sid)
+    except Exception as e:
+        log.warning("connect log failed: %s", e)
 
 
 @sio.event
 async def disconnect(sid: str) -> None:
-    log.info("[disconnect] sid=%s", sid)
-    room_id = sid_to_room.pop(sid, None)
-    if not room_id:
-        return
-    room = rooms.get(room_id)
-    if not room:
-        return
-    player_id = room.sid_to_player.pop(sid, None)
-
-    # Mark the player as offline (informational for other clients).
-    # Don't remove yet — we wait LOBBY_GRACE_SECONDS for a reconnect.
-    if player_id:
-        player = next((p for p in room.game.players if p.id == player_id), None)
-        if player:
-            player.is_online = False
-        # Schedule a delayed cleanup task only for lobby-phase players.
-        # During an active game we KEEP offline players forever; the game can
-        # pause on their turn and they can reconnect by name later.
-        if room.game.phase is Phase.WAITING:
-            asyncio.create_task(_grace_cleanup_lobby(room.id, player_id))
-
     try:
-        await sio.leave_room(sid, room_id)
-    except Exception:
-        pass
+        log.info("[disconnect] sid=%s", sid)
+        # Clean rate-limit bucket
+        _rate_buckets.pop(sid, None)
+        room_id = sid_to_room.pop(sid, None)
+        if not room_id:
+            return
+        room = rooms.get(room_id)
+        if not room:
+            return
+        player_id = room.sid_to_player.pop(sid, None)
 
-    if room.sid_to_player or room.game.players:
-        await broadcast_room(room)
+        if player_id:
+            player = next((p for p in room.game.players if p.id == player_id), None)
+            if player:
+                player.is_online = False
+            if room.game.phase is Phase.WAITING:
+                asyncio.create_task(_grace_cleanup_lobby(room.id, player_id))
+
+        try:
+            await sio.leave_room(sid, room_id)
+        except Exception:
+            pass
+
+        if room.sid_to_player or room.game.players:
+            await broadcast_room(room)
+    except Exception as e:
+        log.exception("disconnect handler crashed sid=%s: %s", sid, e)
 
 
 async def _grace_cleanup_lobby(room_id: str, player_id: str) -> None:
     """After the grace period, remove a still-offline lobby player. If the
-    room is then empty, drop it."""
-    await asyncio.sleep(LOBBY_GRACE_SECONDS)
-    room = rooms.get(room_id)
-    if not room:
-        return
-    player = next((p for p in room.game.players if p.id == player_id), None)
-    if not player or player.is_online:
-        return
-    if room.game.phase is not Phase.WAITING:
-        return
+    room is then empty, drop it. Wrapped in try/except so background-task
+    crashes can't take the server down."""
     try:
-        room.game.remove_player(player_id)
-        log.info("[grace-cleanup] removed offline lobby player=%s room=%s", player_id, room_id)
-    except GameError:
-        pass
-    if not room.sid_to_player and not room.game.players:
-        rooms.pop(room_id, None)
-        log.info("[grace-cleanup] removed empty room=%s", room_id)
-    else:
-        await broadcast_room(room)
+        await asyncio.sleep(LOBBY_GRACE_SECONDS)
+        room = rooms.get(room_id)
+        if not room:
+            return
+        player = next((p for p in room.game.players if p.id == player_id), None)
+        if not player or player.is_online:
+            return
+        if room.game.phase is not Phase.WAITING:
+            return
+        try:
+            room.game.remove_player(player_id)
+            log.info("[grace-cleanup] removed offline lobby player=%s room=%s",
+                     player_id, room_id)
+        except GameError:
+            pass
+        if not room.sid_to_player and not room.game.players:
+            rooms.pop(room_id, None)
+            log.info("[grace-cleanup] removed empty room=%s", room_id)
+        else:
+            await broadcast_room(room)
+    except Exception as e:
+        log.exception("_grace_cleanup_lobby crashed room=%s player=%s: %s",
+                      room_id, player_id, e)
 
 
 @sio.event
+@safe_event()
 async def create_room(sid: str, data: dict) -> None:
+    data = data or {}
     name = (data.get("name") or "").strip() or "Spieler"
     room_id = uuid.uuid4().hex[:6].upper()
     room = Room(id=room_id)
     rooms[room_id] = room
-    log.info("[create_room] sid=%s name=%s -> room=%s", sid, name, room_id)
+    _log_event("create_room", sid, room, f"name={name}")
     await _join(sid, room, name)
     await sio.emit("room_created", {"room_id": room_id}, to=sid)
 
 
 @sio.event
+@safe_event()
 async def join_room(sid: str, data: dict) -> None:
+    data = data or {}
     room_id = (data.get("room_id") or "").strip().upper()
     name = (data.get("name") or "").strip() or "Spieler"
-    log.info("[join_room] sid=%s name=%s room=%s", sid, name, room_id)
     room = rooms.get(room_id)
+    _log_event("join_room", sid, room, f"name={name} room_id={room_id}")
     if not room:
         await send_error(sid, "Raum nicht gefunden.")
         await sio.emit("rejoin_failed", {"reason": "no_room"}, to=sid)
@@ -197,7 +286,7 @@ async def join_room(sid: str, data: dict) -> None:
         None,
     )
     if existing:
-        await rejoin(sid, {"room_id": room.id, "player_id": existing.id, "name": name})
+        await _do_rejoin(sid, room.id, existing.id, name)
         return
 
     await _join(sid, room, name)
@@ -246,23 +335,9 @@ async def _join(sid: str, room: Room, name: str) -> None:
     await broadcast_room(room)
 
 
-@sio.event
-async def rejoin(sid: str, data: dict) -> None:
-    """Reconnect handler: client provides existing {room_id, player_id?, name?}
-    and gets its sid re-mapped to the existing player.
-
-    Lookup priority:
-      1. player_id (most precise, survives name collisions)
-      2. name match (works after a hard reload when only name was kept)
-
-    No new player is created here — for that, use create_room/join_room.
-    """
-    room_id = (data.get("room_id") or "").strip().upper()
-    player_id = (data.get("player_id") or "").strip()
-    name = (data.get("name") or "").strip()
-    log.info("[rejoin] sid=%s room=%s player_id=%s name=%s",
-             sid, room_id, player_id or "—", name or "—")
-
+async def _do_rejoin(sid: str, room_id: str, player_id: str, name: str) -> None:
+    """Internal rejoin logic. Caller must already have validated/cleaned input.
+    Looks up by player_id first, then name as fallback."""
     room = rooms.get(room_id)
     if not room:
         await sio.emit("rejoin_failed", {"reason": "no_room"}, to=sid)
@@ -272,7 +347,6 @@ async def rejoin(sid: str, data: dict) -> None:
     if player_id:
         player = next((p for p in room.game.players if p.id == player_id), None)
     if player is None and name:
-        # Name fallback (case-insensitive, trimmed)
         nlow = name.lower()
         player = next((p for p in room.game.players if p.name.lower() == nlow), None)
 
@@ -280,12 +354,10 @@ async def rejoin(sid: str, data: dict) -> None:
         await sio.emit("rejoin_failed", {"reason": "no_player"}, to=sid)
         return
 
-    # If this sid is currently mapped to a different room, leave it.
     cur = sid_to_room.get(sid)
     if cur and cur != room.id:
         await _leave_previous_room(sid)
 
-    # Drop any stale sid mappings still pointing to this player
     for old_sid, pid in list(room.sid_to_player.items()):
         if pid == player.id and old_sid != sid:
             room.sid_to_player.pop(old_sid, None)
@@ -294,130 +366,167 @@ async def rejoin(sid: str, data: dict) -> None:
     player.is_online = True
     room.sid_to_player[sid] = player.id
     sid_to_room[sid] = room.id
-    await sio.enter_room(sid, room.id)
+    try:
+        await sio.enter_room(sid, room.id)
+    except Exception:
+        pass
     await sio.emit(
         "joined",
         {"room_id": room.id, "player_id": player.id, "name": player.name},
         to=sid,
     )
     for msg in room.chat:
-        await sio.emit("chat", msg, to=sid)
+        try:
+            await sio.emit("chat", msg, to=sid)
+        except Exception:
+            pass
     await broadcast_room(room)
-    log.info("[rejoin OK] sid=%s -> player=%s (%s) in %s",
+    log.info("rejoin OK sid=%s -> player=%s (%s) in %s",
              sid, player.id, player.name, room.id)
 
 
 @sio.event
+@safe_event(rate_limited=False)  # rejoin needs to bypass rate limit (auto-fired on reconnect)
+async def rejoin(sid: str, data: dict) -> None:
+    """Reconnect handler: client provides {room_id, player_id?, name?}.
+    Lookup priority: player_id first, then name as fallback."""
+    data = data or {}
+    room_id = (data.get("room_id") or "").strip().upper()
+    player_id = (data.get("player_id") or "").strip()
+    name = (data.get("name") or "").strip()
+    log.info("[rejoin] sid=%s room=%s player_id=%s name=%s",
+             sid, room_id, player_id or "—", name or "—")
+    await _do_rejoin(sid, room_id, player_id, name)
+
+
+@sio.event
+@safe_event()
 async def list_rooms(sid: str, data: dict = None) -> None:
     """Return a snapshot of all currently active rooms."""
     out = []
     for r in rooms.values():
-        ph = r.game.phase
-        out.append({
-            "room_id": r.id,
-            "players": len(r.game.players),
-            "max_players": r.game.MAX_PLAYERS,
-            "min_players": r.game.MIN_PLAYERS,
-            "status": "lobby" if ph is Phase.WAITING else "ingame",
-            "joinable": ph is Phase.WAITING and len(r.game.players) < r.game.MAX_PLAYERS,
-            "player_names": [p.name for p in r.game.players],
-        })
+        try:
+            ph = r.game.phase
+            out.append({
+                "room_id": r.id,
+                "players": len(r.game.players),
+                "max_players": r.game.MAX_PLAYERS,
+                "min_players": r.game.MIN_PLAYERS,
+                "status": "lobby" if ph is Phase.WAITING else "ingame",
+                "joinable": ph is Phase.WAITING and len(r.game.players) < r.game.MAX_PLAYERS,
+                "player_names": [p.name for p in r.game.players],
+            })
+        except Exception as e:
+            log.warning("list_rooms entry skipped (room=%s): %s", getattr(r, "id", "?"), e)
     out.sort(key=lambda x: (not x["joinable"], x["room_id"]))
     await sio.emit("rooms_list", {"rooms": out}, to=sid)
 
 
 @sio.event
+@safe_event()
 async def start_game(sid: str, data: dict) -> None:
     room = _room_of(sid)
     if not room:
         return
-    log.info("[start_game] sid=%s room=%s", sid, room.id)
-    try:
-        room.game.start_game()
-    except GameError as e:
-        await send_error(sid, str(e))
-        return
+    _log_event("start_game", sid, room)
+    room.game.start_game()  # GameError caught by safe_event
     log_room(room, "after start_game")
     await broadcast_room(room)
 
 
 @sio.event
+@safe_event()
 async def place_bid(sid: str, data: dict) -> None:
+    data = data or {}
     room = _room_of(sid)
     if not room:
-        await send_error(sid, "Verbindung verloren — bitte neu laden.")
-        return
+        return  # silently ignore — client probably stale, rejoin will fix
     player_id = room.sid_to_player.get(sid)
     if not player_id:
-        await send_error(sid, "Du bist nicht im Spiel registriert.")
-        return
+        return  # silently ignore — sid not bound to a player
     try:
         bid = int(data.get("bid"))
     except (TypeError, ValueError):
-        await send_error(sid, "Ungültiger Tipp.")
-        return
-    log.info("[place_bid] sid=%s room=%s player=%s bid=%d", sid, room.id, player_id, bid)
-    try:
-        room.game.place_bid(player_id, bid)
-    except GameError as e:
-        log.warning("[place_bid REJECTED] %s", e)
-        await send_error(sid, str(e))
-        return
-    log_room(room, "after place_bid")
+        return  # silent ignore — malformed payload
+    _log_event("place_bid", sid, room, f"bid={bid}")
+    room.game.place_bid(player_id, bid)  # GameError caught by safe_event
     await broadcast_room(room)
 
 
 @sio.event
+@safe_event()
 async def play_card(sid: str, data: dict) -> None:
+    data = data or {}
     room = _room_of(sid)
     if not room:
-        await send_error(sid, "Verbindung verloren — bitte neu laden.")
         return
     player_id = room.sid_to_player.get(sid)
     if not player_id:
-        await send_error(sid, "Du bist nicht im Spiel registriert.")
         return
-    card_data = data.get("card")
-    log.info(
-        "[play_card] sid=%s room=%s player=%s card=%s",
-        sid, room.id, player_id, card_data,
-    )
-    try:
-        if card_data and card_data.get("hidden"):
-            room.game.play_blind(player_id)
-        else:
-            card = card_from_dict(card_data or {})
-            room.game.play_card(player_id, card)
-    except GameError as e:
-        log.warning("[play_card REJECTED] %s", e)
-        await send_error(sid, str(e))
-        return
-    except Exception as e:
-        log.exception("[play_card FAILED] %s", e)
-        await send_error(sid, "Ungültige Karte.")
-        return
-    log_room(room, "after play_card")
+    card_data = data.get("card") or {}
+    _log_event("play_card", sid, room, f"card={card_data}")
+    if card_data.get("hidden"):
+        room.game.play_blind(player_id)
+    else:
+        card = card_from_dict(card_data)
+        room.game.play_card(player_id, card)
     await broadcast_room(room)
 
 
 @sio.event
+@safe_event()
 async def next_round(sid: str, data: dict) -> None:
     room = _room_of(sid)
     if not room:
         return
-    log.info("[next_round] sid=%s room=%s", sid, room.id)
-    try:
-        room.game.start_next_round()
-    except GameError as e:
-        log.warning("[next_round REJECTED] %s", e)
-        await send_error(sid, str(e))
-        return
-    log_room(room, "after next_round")
+    _log_event("next_round", sid, room)
+    room.game.start_next_round()  # GameError caught by safe_event (silently next time)
     await broadcast_room(room)
 
 
 @sio.event
+@safe_event()
+async def leave_room(sid: str, data: dict = None) -> None:
+    """Explicit leave: client tells the server they're done with this room."""
+    room = _room_of(sid)
+    if not room:
+        try:
+            await sio.emit("left_room", {}, to=sid)
+        except Exception:
+            pass
+        return
+    player_id = room.sid_to_player.pop(sid, None)
+    sid_to_room.pop(sid, None)
+    _log_event("leave_room", sid, room, f"player_id={player_id}")
+    if player_id:
+        if room.game.phase is Phase.WAITING:
+            try:
+                room.game.remove_player(player_id)
+            except GameError:
+                pass
+        else:
+            p = next((p for p in room.game.players if p.id == player_id), None)
+            if p:
+                p.is_online = False
+    try:
+        await sio.leave_room(sid, room.id)
+    except Exception:
+        pass
+    try:
+        await sio.emit("left_room", {}, to=sid)
+    except Exception:
+        pass
+    if not room.sid_to_player and not room.game.players:
+        rooms.pop(room.id, None)
+        log.info("room=%s removed (empty after leave)", room.id)
+    else:
+        await broadcast_room(room)
+
+
+@sio.event
+@safe_event()
 async def chat_message(sid: str, data: dict) -> None:
+    data = data or {}
     room = _room_of(sid)
     if not room:
         return

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css?v=10" />
+  <link rel="stylesheet" href="/static/style.css?v=13" />
 </head>
 <body>
   <div class="bg-stars"></div>
@@ -115,6 +115,10 @@
           <span id="room-info" class="room-code"></span>
           <button id="copy-room" class="btn-icon-only" title="Kopieren">⎘</button>
         </div>
+        <button id="leave-game-btn" class="btn btn-leave" title="Spiel verlassen">
+          <span class="leave-icon">⎋</span>
+          <span class="leave-text">Verlassen</span>
+        </button>
       </div>
     </header>
 
@@ -158,6 +162,9 @@
               <button class="quick-chip" data-msg="Rip 💀">Rip 💀</button>
               <button class="quick-chip" data-msg="All-in 😈">All-in 😈</button>
               <button class="quick-chip" data-msg="Bruder… 🤦‍♂️">Bruder 🤦‍♂️</button>
+              <button class="quick-chip" data-msg="Komm Bruder… 🤦‍♂️">Komm Bruder 🤦‍♂️</button>
+              <button class="quick-chip" data-msg="Du Fisch 🐡">Du Fisch 🐡</button>
+              <button class="quick-chip" data-msg="Du schuldest mir ein Shawerma 🌯">Shawerma 🌯</button>
             </div>
             <div id="emoji-bar" class="emoji-bar">
               <button class="emoji-chip" data-emoji="😄">😄</button>
@@ -172,6 +179,8 @@
               <button class="emoji-chip" data-emoji="💀">💀</button>
               <button class="emoji-chip" data-emoji="👀">👀</button>
               <button class="emoji-chip" data-emoji="🎯">🎯</button>
+              <button class="emoji-chip" data-emoji="🐡">🐡</button>
+              <button class="emoji-chip" data-emoji="🌯">🌯</button>
             </div>
             <form id="chat-form">
               <input id="chat-input" type="text" maxlength="200" placeholder="Nachricht..." autocomplete="off" />
@@ -296,7 +305,7 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"
     integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO"
     crossorigin="anonymous"></script>
-  <script src="/static/card.js?v=10"></script>
-  <script src="/static/app.js?v=10"></script>
+  <script src="/static/card.js?v=13"></script>
+  <script src="/static/app.js?v=13"></script>
 </body>
 </html>

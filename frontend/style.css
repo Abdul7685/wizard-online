@@ -567,6 +567,36 @@ input[type="text"]:focus {
   border-color: var(--accent);
 }
 
+.btn-leave {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ff8b8b;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-leave:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ffb3b3;
+  border-color: rgba(239, 68, 68, 0.7);
+  transform: translateY(-1px);
+}
+.btn-leave .leave-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+@media (max-width: 700px), (max-width: 900px) and (orientation: landscape) {
+  .btn-leave .leave-text { display: none; }
+  .btn-leave { padding: 0.35rem 0.55rem; }
+}
+
 /* Layout: players left narrow, table big center, chat right narrow, hand full bottom */
 .game-grid {
   display: grid;
@@ -763,7 +793,10 @@ input[type="text"]:focus {
   border: 2px solid rgba(255, 255, 255, 0.12);
 }
 
-.player-info { min-width: 0; }
+.player-info {
+  min-width: 0;
+  overflow: hidden;
+}
 .player-info .pname {
   font-weight: 600;
   font-size: 0.9rem;
@@ -774,15 +807,18 @@ input[type="text"]:focus {
 }
 .player-info .pstats {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.6rem;
   font-size: 0.72rem;
   color: var(--text-dim);
+  min-width: 0;
 }
 .pstat {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.3rem;
   line-height: 1.05;
+  min-width: 0;
 }
 .pstat .label { color: var(--text-muted); font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; }
 .pstat .value { color: var(--text); font-weight: 600; font-size: 0.85rem; font-family: "Cinzel", serif; }

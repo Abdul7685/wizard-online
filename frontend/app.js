@@ -1,5 +1,5 @@
 // Wizard-Online Client (Hausregeln).
-const APP_VERSION = "v10";
+const APP_VERSION = "v13";
 console.log(`[wizard] frontend ${APP_VERSION} loaded`);
 
 const socket = io(window.location.origin, {
@@ -11,6 +11,20 @@ const socket = io(window.location.origin, {
 });
 
 const SESSION_KEY = "wizard.session.v1";
+
+// Debounce action emits to prevent double-clicks from spamming the server.
+const _emitTimes = {};
+function emitAction(event, data, debounceMs = 600) {
+  const now = Date.now();
+  const last = _emitTimes[event] || 0;
+  if (now - last < debounceMs) {
+    console.warn(`[debounce] suppressed duplicate ${event} (${now - last}ms)`);
+    return false;
+  }
+  _emitTimes[event] = now;
+  socket.emit(event, data || {});
+  return true;
+}
 
 function saveSession() {
   if (state.roomId && state.name) {
@@ -105,6 +119,10 @@ const state = {
   announcedTrickId: null,
   announcedRoundNumber: null,
   prevScores: new Map(),
+  // Trick visual hold: keep showing the just-completed trick for 2s
+  trickHoldUntil: 0,
+  trickHoldTimer: null,
+  lastShownTrickKey: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -151,6 +169,44 @@ $("room-input").addEventListener("keydown", (e) => {
 function setLobbyError(msg) { $("lobby-error").textContent = msg; }
 
 // ---- Room copy / chat toggle / modal ----
+
+$("leave-game-btn").addEventListener("click", () => {
+  if (!confirm("Spiel wirklich verlassen?")) return;
+  leaveGame();
+});
+
+function leaveGame() {
+  console.log("[wizard] leave game");
+  try { socket.emit("leave_room", {}); } catch (e) {}
+  if (state.trickHoldTimer) {
+    clearTimeout(state.trickHoldTimer);
+    state.trickHoldTimer = null;
+  }
+  state.trickHoldUntil = 0;
+  state.lastShownTrickKey = null;
+  clearSession();
+  state.roomId = null;
+  state.playerId = null;
+  state.gameState = null;
+  state.hand = [];
+  state.blindView = {};
+  state.legalMoves = [];
+  state.prevScores = new Map();
+  state.announcedTrickId = null;
+  state.announcedRoundNumber = null;
+  // Reset UI bits that might still show stale data
+  if ($("chat-log")) $("chat-log").innerHTML = "";
+  if ($("players-list")) $("players-list").innerHTML = "";
+  if ($("room-info")) $("room-info").textContent = "";
+  closeRoundModal();
+  closeRulesModal();
+  showLobby();
+  setLobbyError("");
+}
+
+socket.on("left_room", () => {
+  console.log("[wizard] server confirmed left_room");
+});
 
 $("copy-room").addEventListener("click", async () => {
   if (!state.roomId) return;
@@ -299,6 +355,11 @@ socket.on("error_message", ({ message }) => {
   else setLobbyError(message);
 });
 
+function trickKeyOf(t) {
+  if (!t || !t.plays) return null;
+  return t.plays.map((p) => `${p.card.type}-${p.card.suit}-${p.card.value}`).join("|") + "@" + t.winner_id;
+}
+
 socket.on("game_state", (gs) => {
   state.prevState = state.gameState;
   state.gameState = gs;
@@ -307,6 +368,27 @@ socket.on("game_state", (gs) => {
       state.playerOrderIndex.set(p.id, state.playerOrderIndex.size);
     }
   });
+
+  // Visual hold: when a NEW trick just completed, keep showing the last
+  // trick's cards on the felt for 2 seconds so the winning play is visible.
+  // Logic on the server is unchanged — this only delays the render.
+  const newKey = trickKeyOf(gs.last_completed_trick);
+  if (newKey && newKey !== state.lastShownTrickKey) {
+    state.lastShownTrickKey = newKey;
+    state.trickHoldUntil = Date.now() + 2000;
+    if (state.trickHoldTimer) clearTimeout(state.trickHoldTimer);
+    state.trickHoldTimer = setTimeout(() => {
+      state.trickHoldTimer = null;
+      state.trickHoldUntil = 0;
+      render();
+    }, 2050);
+  } else if (state.trickHoldUntil && gs.current_trick && gs.current_trick.length > 0) {
+    // Next trick already started during the hold — cancel hold immediately
+    if (state.trickHoldTimer) clearTimeout(state.trickHoldTimer);
+    state.trickHoldTimer = null;
+    state.trickHoldUntil = 0;
+  }
+
   handleTransitions(state.prevState, gs);
   render();
 });
@@ -640,7 +722,7 @@ function renderPlayers(gs) {
 
     const sayStat = document.createElement("div");
     sayStat.className = "pstat";
-    sayStat.innerHTML = `<span class="label">Ansage</span><span class="value">${p.bid === null || p.bid === undefined ? "—" : p.bid}</span>`;
+    sayStat.innerHTML = `<span class="label">Tipp</span><span class="value">${p.bid === null || p.bid === undefined ? "—" : p.bid}</span>`;
     stats.appendChild(sayStat);
 
     const wonStat = document.createElement("div");
@@ -652,7 +734,7 @@ function renderPlayers(gs) {
         wonClass = (p.tricks === p.bid) ? " match" : " miss";
       }
     }
-    wonStat.innerHTML = `<span class="label">Gewonnen</span><span class="value${wonClass}">${p.tricks}</span>`;
+    wonStat.innerHTML = `<span class="label">Stiche</span><span class="value${wonClass}">${p.tricks}</span>`;
     stats.appendChild(wonStat);
 
     info.appendChild(stats);
@@ -723,8 +805,20 @@ function renderTable(gs) {
   }
 
   // phase === "playing"
-  const plays = gs.current_trick || [];
-  renderSeats(ring, gs, plays);
+  // While holding the visual after a completed trick: render the old trick's
+  // plays (with winner highlighted) for 2 seconds before showing the next state.
+  const isHolding = state.trickHoldUntil && Date.now() < state.trickHoldUntil;
+  const plays = (isHolding && gs.last_completed_trick)
+    ? gs.last_completed_trick.plays
+    : (gs.current_trick || []);
+
+  renderSeats(ring, gs, plays, isHolding);
+
+  if (isHolding && gs.last_completed_trick) {
+    const winnerName = gs.last_completed_trick.winner_name;
+    center.innerHTML = `<div class="winner-announce">✦ Stich an ${escapeHtml(winnerName)}</div>`;
+    return;
+  }
 
   if (!plays.length) {
     if (gs.last_trick_winner) {
@@ -747,7 +841,7 @@ function renderTable(gs) {
 }
 
 // Position seats on the felt around the table, rotated so current player is front-bottom.
-function renderSeats(ring, gs, plays) {
+function renderSeats(ring, gs, plays, isHolding = false) {
   const players = gs.players;
   const n = players.length;
   if (!n) return;
@@ -774,11 +868,15 @@ function renderSeats(ring, gs, plays) {
 
     const seat = document.createElement("div");
     seat.className = "trick-seat";
-    if (p.id === gs.current_player && gs.phase === "playing") seat.classList.add("current-seat");
+    if (p.id === gs.current_player && gs.phase === "playing" && !isHolding) {
+      seat.classList.add("current-seat");
+    }
 
     const play = plays.find((pl) => pl.player_id === p.id);
     const winnerId = gs.last_completed_trick && gs.last_completed_trick.winner_id;
-    if (play && plays.length === n && winnerId === p.id) seat.classList.add("winner");
+    if (play && winnerId === p.id && (isHolding || plays.length === n)) {
+      seat.classList.add("winner");
+    }
 
     // Card wrapper
     if (play) {
@@ -824,7 +922,7 @@ function renderAction(gs) {
       const btn = document.createElement("button");
       btn.className = "btn btn-gold";
       btn.textContent = "Spiel starten";
-      btn.onclick = () => socket.emit("start_game", {});
+      btn.onclick = () => emitAction("start_game", {});
       area.appendChild(btn);
     } else {
       const hint = document.createElement("p");
@@ -855,7 +953,10 @@ function renderAction(gs) {
           b.disabled = true;
           b.title = `Tipp-Zwang: Summe darf nicht ${gs.round} ergeben`;
         } else {
-          b.onclick = () => socket.emit("place_bid", { bid: i });
+          b.onclick = () => {
+            b.disabled = true;
+            if (!emitAction("place_bid", { bid: i })) b.disabled = false;
+          };
         }
         wrap.appendChild(b);
       }
@@ -905,7 +1006,10 @@ function renderAction(gs) {
     const btn = document.createElement("button");
     btn.className = "btn btn-primary";
     btn.textContent = "Nächste Runde";
-    btn.onclick = () => socket.emit("next_round", {});
+    btn.onclick = () => {
+      btn.disabled = true;
+      emitAction("next_round", {});
+    };
     area.appendChild(btn);
     return;
   }
@@ -962,8 +1066,9 @@ function renderHand(gs) {
     const el = Cards.cardElement(card, {
       onClick: canPlay ? (c) => {
         if (state.selectedCardKey === key) {
-          socket.emit("play_card", { card: c });
-          state.selectedCardKey = null;
+          if (emitAction("play_card", { card: c })) {
+            state.selectedCardKey = null;
+          }
         } else {
           state.selectedCardKey = key;
           renderHand(gs);
@@ -984,7 +1089,7 @@ function renderHiddenCard(clickable) {
   el.innerHTML = `<div class="card-back-pattern">✦</div>`;
   if (clickable) {
     el.classList.add("clickable", "legal");
-    el.addEventListener("click", () => socket.emit("play_card", { card: { hidden: true } }));
+    el.addEventListener("click", () => emitAction("play_card", { card: { hidden: true } }));
   } else {
     el.classList.add("disabled");
   }
@@ -1069,7 +1174,8 @@ function openRoundModal(gs, isGameOver) {
     next.className = "btn btn-primary";
     next.textContent = "Nächste Runde starten";
     next.onclick = () => {
-      socket.emit("next_round", {});
+      next.disabled = true;
+      emitAction("next_round", {});
       closeRoundModal();
     };
     footer.appendChild(next);
