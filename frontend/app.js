@@ -1,5 +1,5 @@
 // Wizard-Online Client (Hausregeln).
-const APP_VERSION = "v13";
+const APP_VERSION = "v14";
 console.log(`[wizard] frontend ${APP_VERSION} loaded`);
 
 const socket = io(window.location.origin, {
@@ -491,14 +491,35 @@ function handleTransitions(prev, gs) {
     state.prevScores.set(p.id, p.score);
   });
 
-  // Round modal on round_done / game_over
+  // Round modal on round_done / game_over.
+  // If a trick hold is active (last card just landed), delay the modal so
+  // every player can see the final card on the felt for ~2 seconds first.
+  const holdMsLeft = state.trickHoldUntil ? Math.max(0, state.trickHoldUntil - Date.now()) : 0;
+  const modalDelay = holdMsLeft > 0 ? holdMsLeft + 150 : 0;
+
   if (gs.phase === "round_done" && state.announcedRoundNumber !== gs.round) {
     state.announcedRoundNumber = gs.round;
-    openRoundModal(gs, false);
+    if (modalDelay > 0) {
+      setTimeout(() => {
+        if (state.gameState && state.gameState.phase === "round_done") {
+          openRoundModal(state.gameState, false);
+        }
+      }, modalDelay);
+    } else {
+      openRoundModal(gs, false);
+    }
   }
   if (gs.phase === "game_over" && state.announcedRoundNumber !== `over:${gs.round}`) {
     state.announcedRoundNumber = `over:${gs.round}`;
-    openRoundModal(gs, true);
+    if (modalDelay > 0) {
+      setTimeout(() => {
+        if (state.gameState && state.gameState.phase === "game_over") {
+          openRoundModal(state.gameState, true);
+        }
+      }, modalDelay);
+    } else {
+      openRoundModal(gs, true);
+    }
   }
   if (gs.phase === "bidding" || gs.phase === "playing" || gs.phase === "waiting") {
     closeRoundModal();
@@ -799,15 +820,17 @@ function renderTable(gs) {
     return;
   }
 
-  if (gs.phase === "round_done" || gs.phase === "game_over") {
+  // While holding the visual after a completed trick: render the old trick's
+  // plays (with winner highlighted) for 2 seconds before showing the next
+  // state. This applies in playing, round_done, AND game_over so the very
+  // last card of a round/game stays visible to all players.
+  const isHolding = state.trickHoldUntil && Date.now() < state.trickHoldUntil;
+
+  if ((gs.phase === "round_done" || gs.phase === "game_over") && !isHolding) {
     center.innerHTML = `<div class="trick-hint">${gs.phase === "game_over" ? "Spiel vorbei" : "Runde zu Ende"}</div>`;
     return;
   }
 
-  // phase === "playing"
-  // While holding the visual after a completed trick: render the old trick's
-  // plays (with winner highlighted) for 2 seconds before showing the next state.
-  const isHolding = state.trickHoldUntil && Date.now() < state.trickHoldUntil;
   const plays = (isHolding && gs.last_completed_trick)
     ? gs.last_completed_trick.plays
     : (gs.current_trick || []);
@@ -999,7 +1022,16 @@ function renderAction(gs) {
     return;
   }
 
+  const isHolding = state.trickHoldUntil && Date.now() < state.trickHoldUntil;
+
   if (gs.phase === "round_done") {
+    if (isHolding) {
+      const hint = document.createElement("p");
+      hint.className = "subtle";
+      hint.textContent = "Letzter Stich…";
+      area.appendChild(hint);
+      return;
+    }
     const info = document.createElement("p");
     info.innerHTML = `<strong>Runde ${gs.round} zu Ende.</strong>`;
     area.appendChild(info);
@@ -1015,6 +1047,13 @@ function renderAction(gs) {
   }
 
   if (gs.phase === "game_over") {
+    if (isHolding) {
+      const hint = document.createElement("p");
+      hint.className = "subtle";
+      hint.textContent = "Letzter Stich…";
+      area.appendChild(hint);
+      return;
+    }
     const sorted = [...gs.players].sort((a, b) => b.score - a.score);
     const h = document.createElement("p");
     h.innerHTML = `🏆 <strong>${escapeHtml(sorted[0].name)}</strong> gewinnt mit <strong>${sorted[0].score}</strong> Punkten!`;
